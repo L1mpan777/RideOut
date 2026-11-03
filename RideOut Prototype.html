@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="sv" class="h-full w-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RideOut - Social Rider Network & Map</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        ride: {
+                            yellow: '#FFDF00',
+                            orange: '#FF5500',
+                            cyan: '#00F0FF',
+                            purple: '#A855F7',
+                            dark: '#06080d',
+                            card: 'rgba(16, 20, 30, 0.88)',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body, html {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #06080d;
+            user-select: none;
+            color: #ffffff;
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+            background: #06080d;
+        }
+
+        .leaflet-tile {
+            filter: brightness(0.65) contrast(1.25) saturate(0.85) hue-rotate(195deg) invert(1);
+        }
+
+        .glass-panel {
+            background: rgba(15, 20, 32, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .glass-button {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-button:hover, .glass-button:active {
+            background: rgba(255, 255, 255, 0.18);
+            transform: scale(0.97);
+        }
+
+        .rider-marker-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .pulse-ring {
+            position: absolute;
+            width: 58px;
+            height: 58px;
+            border-radius: 50%;
+            animation: ridePulse 2.2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+            pointer-events: none;
+        }
+
+        .pulse-ring.car { background: rgba(0, 240, 255, 0.35); }
+        .pulse-ring.helmet { background: rgba(255, 223, 0, 0.4); }
+        .pulse-ring.event { background: rgba(255, 85, 0, 0.5); }
+        .pulse-ring.hazard-accident { background: rgba(244, 63, 94, 0.8); animation: sosPulse 1s ease-in-out infinite; }
+
+        @keyframes ridePulse {
+            0% { transform: scale(0.5); opacity: 0.9; }
+            100% { transform: scale(1.7); opacity: 0; }
+        }
+
+        @keyframes sosPulse {
+            0% { transform: scale(0.6); opacity: 1; }
+            50% { transform: scale(2.0); opacity: 0.4; }
+            100% { transform: scale(0.6); opacity: 1; }
+        }
+
+        .avatar-box {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.7), inset 0 0 8px rgba(255,255,255,0.3);
+            border: 2.5px solid #ffffff;
+            transition: transform 0.25s ease;
+        }
+
+        .vehicle-badge {
+            position: absolute;
+            bottom: -3px;
+            right: -3px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            border: 2px solid #0a0d14;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+        }
+
+        .badge-car { background: #00F0FF; color: #000; }
+        .badge-helmet { background: #FFDF00; color: #000; }
+        .badge-event { background: #FF5500; color: #fff; }
+        .badge-hazard { background: #F43F5E; color: #fff; }
+
+        .rider-label {
+            position: absolute;
+            top: -24px;
+            background: rgba(10, 13, 20, 0.92);
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 800;
+            white-space: nowrap;
+            border: 1px solid rgba(255,255,255,0.18);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+
+        .leaflet-control-zoom { display: none !important; }
+
+        .app-screen {
+            display: none;
+            height: calc(100% - 70px);
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            overflow-y: auto;
+        }
+
+        .app-screen.active {
+            display: block;
+        }
+
+        /* Right Side Chat Drawer */
+        #right-chat-panel {
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #right-chat-panel.closed {
+            transform: translateX(100%);
+        }
+    </style>
+</head>
+<body class="h-full w-full relative select-none bg-slate-950 overflow-hidden">
+
+    <!-- MAIN APP HEADER -->
+    <header class="fixed top-0 left-0 right-0 z-30 h-16 glass-panel border-b border-white/10 px-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="flex flex-col items-center justify-center p-1.5 px-3 bg-black/95 rounded-xl border border-white/20 shadow-lg">
+                <svg class="w-8 h-5 text-white" viewBox="0 0 32 20" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 16L19 7L29 18H2" stroke="rgba(255, 255, 255, 0.35)"/>
+                    <path d="M2 18L11 3L22 18H2" stroke="#FFFFFF" fill="rgba(255, 255, 255, 0.12)"/>
+                    <circle cx="7.5" cy="18" r="1.8" fill="#FFFFFF"/>
+                    <circle cx="18.5" cy="18" r="1.8" fill="#FFFFFF"/>
+                </svg>
+                <h1 class="font-black text-[10px] tracking-widest text-white">RIDE<span class="text-gray-400">OUT</span></h1>
+            </div>
+            <div>
+                <h2 id="top-title" class="font-black text-sm text-white">RideOut Feed</h2>
+                <p id="top-sub" class="text-[10px] text-gray-400">Gemenskap & Aktiviteter</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- Top Right Driver Indicator -->
+            <div id="header-driver-tag" class="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-900 border border-white/15 text-xs font-bold text-gray-300">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span id="header-driver-name" class="text-white font-extrabold text-xs">Förare</span>
+            </div>
+
+            <!-- Speed Overview Button in Header -->
+            <button onclick="openSpeedOverviewModal()" class="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-extrabold flex items-center gap-1 shadow-lg">
+                <i data-lucide="gauge" class="w-4 h-4"></i> <span id="btn-hdr-speed" class="hidden sm:inline">Hastighet</span>
+            </button>
+
+            <button onclick="openPersonalSOSModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-xl text-white font-black text-xs flex items-center gap-1 shadow-lg shadow-red-600/40 animate-pulse">
+                <i data-lucide="alert-triangle" class="w-4 h-4"></i> SOS
+            </button>
+            <button onclick="toggleRightChat()" class="p-2 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 border border-orange-500/40 relative">
+                <i data-lucide="message-square" class="w-4 h-4"></i>
+                <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-orange-500 rounded-full animate-ping"></span>
+            </button>
+            <button onclick="openUserConfigModal()" class="p-2 rounded-xl bg-white/10 text-white hover:bg-white/20">
+                <i data-lucide="user-cog" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- RIGHT SIDE DIRECT MESSAGES DRAWER -->
+    <aside id="right-chat-panel" class="closed fixed top-16 right-0 bottom-16 z-40 w-full sm:w-80 md:w-96 glass-panel border-l border-white/15 bg-slate-950/95 flex flex-col shadow-2xl">
+        <!-- Drawer Header -->
+        <div class="p-3.5 border-b border-white/10 flex items-center justify-between bg-slate-900/90">
+            <div class="flex items-center gap-2">
+                <i data-lucide="message-square-text" class="w-5 h-5 text-orange-400"></i>
+                <div>
+                    <h3 id="dm-title" class="font-black text-white text-xs">Direktmeddelanden</h3>
+                    <p id="dm-sub" class="text-[10px] text-gray-400">Chatta med förare i närheten</p>
+                </div>
+            </div>
+            <button onclick="toggleRightChat()" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <!-- Chat Conversations List View -->
+        <div id="side-chat-list-view" class="flex-1 overflow-y-auto p-3 space-y-3">
+            <div>
+                <h4 class="text-[10px] font-black text-orange-400 uppercase tracking-wider mb-2">🔥 RideOut Grupper</h4>
+                <div onclick="openSideChatConversation('group_e1', 'Stockholm Night Cruise 🌙', 'Gruppchatt • 14 deltagare', 'from-orange-500 to-amber-500')" class="glass-button p-3 rounded-2xl flex items-center justify-between cursor-pointer hover:border-orange-500/50">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-white font-bold text-xs">🔥</div>
+                        <div>
+                            <span class="font-extrabold text-white text-xs block">Stockholm Night Cruise 🌙</span>
+                            <span class="text-[10px] text-gray-300 block truncate max-w-[170px]">Alex_Rider: Samling vid macken! 🏎️</span>
+                        </div>
+                    </div>
+                    <span class="text-[9px] text-gray-400">21:05</span>
+                </div>
+            </div>
+
+            <div>
+                <h4 class="text-[10px] font-black text-cyan-400 uppercase tracking-wider mb-2">💬 Aktiva Riders</h4>
+                <div id="side-direct-chats-list" class="space-y-2">
+                    <!-- Dynamic DM items injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Conversation View (In Side Panel) -->
+        <div id="side-chat-convo-view" class="hidden flex-1 flex flex-col bg-slate-950">
+            <div class="p-3 border-b border-white/10 flex items-center justify-between bg-slate-900/90">
+                <div class="flex items-center gap-2.5">
+                    <button onclick="closeSideChatConversation()" class="text-gray-400 hover:text-white p-1 rounded-lg">
+                        <i data-lucide="chevron-left" class="w-5 h-5"></i>
+                    </button>
+                    <div id="side-convo-avatar" class="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-white font-bold text-xs">A</div>
+                    <div>
+                        <h4 id="side-convo-title" class="font-extrabold text-white text-xs">Alex_Rider</h4>
+                        <span id="side-convo-sub" class="text-[9px] text-gray-400 block">Online</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="side-messages-container" class="flex-1 overflow-y-auto p-3 space-y-2.5 text-xs">
+                <!-- Messages rendered here -->
+            </div>
+
+            <div class="p-2.5 border-t border-white/10 bg-slate-900/90 flex items-center gap-2">
+                <input type="text" id="side-chat-input" placeholder="Skriv ett meddelande..." onkeydown="if(event.key==='Enter') sendSideMessage()" class="flex-1 bg-slate-800 border border-white/15 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-orange-400">
+                <button onclick="sendSideMessage()" class="p-2 bg-orange-500 text-white rounded-xl hover:brightness-110">
+                    <i data-lucide="send" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN NAVIGATION CONTAINER -->
+    <main class="w-full h-full pt-16 pb-20 relative">
+
+        <!-- TAB 1: FEED / HOME SCREEN (MAIN) -->
+        <div id="screen-feed" class="app-screen active p-4 space-y-4 max-w-6xl mx-auto">
+            <!-- Welcome Banner -->
+            <div class="glass-panel rounded-3xl p-5 border border-white/15 relative overflow-hidden bg-gradient-to-r from-slate-900 via-black to-slate-900">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <span class="px-3 py-1 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30 text-[10px] font-black uppercase">Social Network</span>
+                        <h2 class="text-xl font-black text-white mt-2">Välkommen till RideOut 👋</h2>
+                        <p class="text-xs text-gray-300 mt-1">Träffa förare, planera cruises eller utforska kartan i realtid.</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mt-4">
+                    <button onclick="switchTab('events')" class="p-3 bg-white/10 hover:bg-white/20 rounded-2xl border border-white/10 flex items-center gap-3">
+                        <span class="text-2xl">🔥</span>
+                        <div class="text-left">
+                            <span class="text-xs font-black block text-white">RideOuts</span>
+                            <span class="text-[10px] text-gray-400">3 Planerade träffar</span>
+                        </div>
+                    </button>
+                    <button onclick="switchTab('map')" class="p-3 bg-cyan-500/10 hover:bg-cyan-500/20 rounded-2xl border border-cyan-500/30 flex items-center gap-3">
+                        <span class="text-2xl">🗺️</span>
+                        <div class="text-left">
+                            <span class="text-xs font-black block text-cyan-300">Öppna Karta</span>
+                            <span class="text-[10px] text-cyan-400">Se Riders Live</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Layout Grid: Posts on Left, Direct Messages on Right -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <!-- Left Column: Senaste Händelser Feed -->
+                <div class="lg:col-span-2 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h3 id="txt-recent-events" class="text-sm font-black uppercase tracking-wider text-gray-400">Senaste Händelser</h3>
+                        <button onclick="openIncidentModal()" class="text-xs font-bold text-rose-400 hover:underline flex items-center gap-1">
+                            <i data-lucide="siren" class="w-3.5 h-3.5"></i> <span id="txt-report-incident-link">Larma Händelse</span>
+                        </button>
+                    </div>
+
+                    <!-- Feed Posts Cards -->
+                    <div id="feed-posts-container" class="space-y-3">
+                        <!-- Posts dynamically rendered -->
+                    </div>
+                </div>
+
+                <!-- Right Column: Direct Messages Panel Next to Feed -->
+                <div class="lg:col-span-1 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h3 id="txt-messages-header" class="text-sm font-black uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
+                            <i data-lucide="message-square" class="w-4 h-4"></i> Meddelanden
+                        </h3>
+                        <span id="txt-direct-groups-badge" class="text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full font-bold border border-orange-500/30">Direkt & Grupper</span>
+                    </div>
+
+                    <!-- Embedded In-Feed Direct Messages Box -->
+                    <div class="glass-panel p-3.5 rounded-3xl border border-white/15 bg-slate-900/90 space-y-3">
+                        <div>
+                            <h4 class="text-[10px] font-black text-orange-400 uppercase tracking-wider mb-2">🔥 RideOut Gruppchatt</h4>
+                            <div onclick="toggleRightChat(); openSideChatConversation('group_e1', 'Stockholm Night Cruise 🌙', 'Gruppchatt • 14 deltagare', 'from-orange-500 to-amber-500')" class="glass-button p-3 rounded-2xl flex items-center justify-between cursor-pointer hover:border-orange-500/50">
+                                <div class="flex items-center gap-2.5">
+                                    <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-white font-bold text-xs">🔥</div>
+                                    <div>
+                                        <span class="font-extrabold text-white text-xs block">Stockholm Night Cruise</span>
+                                        <span class="text-[10px] text-gray-300 block truncate max-w-[150px]">Alex_Rider: Samling vid macken! 🏎️</span>
+                                    </div>
+                                </div>
+                                <span class="text-[9px] text-gray-400">21:05</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 class="text-[10px] font-black text-cyan-400 uppercase tracking-wider mb-2">💬 Direkta Meddelanden</h4>
+                            <div id="feed-inline-chats-list" class="space-y-2">
+                                <!-- Dynamic DM list rendered here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: RIDEOUT MEETUPS SCREEN -->
+        <div id="screen-events" class="app-screen p-4 space-y-4 max-w-2xl mx-auto">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 id="txt-upcoming-meets" class="text-lg font-black text-white">Kommande RideOuts</h2>
+                    <p id="txt-upcoming-meets-sub" class="text-xs text-gray-400">Hitta cruisingar för bilar, MC, mopeder och fyrhjulningar.</p>
+                </div>
+                <button onclick="openCreateEventModal()" class="px-3.5 py-2 bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl text-white font-extrabold text-xs shadow-lg flex items-center gap-1.5">
+                    <i data-lucide="plus" class="w-4 h-4"></i> <span id="btn-create-event">Skapa</span>
+                </button>
+            </div>
+
+            <div id="events-list-container" class="space-y-3">
+                <!-- Events rendered here -->
+            </div>
+        </div>
+
+        <!-- TAB 3: INTERACTIVE MAP SCREEN -->
+        <div id="screen-map" class="app-screen p-0 relative">
+            <div id="map"></div>
+
+            <!-- MAP OVERLAY CONTROLS -->
+            <div class="absolute top-4 left-4 right-4 z-10 flex items-center justify-between pointer-events-none">
+                <!-- Vehicle Filters -->
+                <div class="glass-panel p-1.5 rounded-2xl flex items-center gap-1 pointer-events-auto shadow-2xl">
+                    <button onclick="setFilter('all')" id="filter-all" class="px-3 py-1 rounded-xl text-xs font-bold transition-all bg-white/20 text-white">Alla</button>
+                    <button onclick="setFilter('car')" id="filter-car" class="px-3 py-1 rounded-xl text-xs font-bold transition-all text-gray-300 hover:text-white">🚗 Bilar</button>
+                    <button onclick="setFilter('helmet')" id="filter-helmet" class="px-3 py-1 rounded-xl text-xs font-bold transition-all text-gray-300 hover:text-white">🏍️ MC/Moppe/Quad</button>
+                </div>
+
+                <div class="flex items-center gap-2 pointer-events-auto">
+                    <!-- Quick Incident Alert Button directly on Map -->
+                    <button onclick="openIncidentModal()" class="px-3 py-2 bg-rose-600 hover:bg-rose-500 rounded-2xl text-white font-black text-xs flex items-center gap-1.5 shadow-xl shadow-rose-600/30">
+                        <i data-lucide="siren" class="w-4 h-4"></i> <span id="btn-map-larma">Larma</span>
+                    </button>
+                    <button onclick="recenterMap()" class="glass-button w-10 h-10 rounded-2xl flex items-center justify-center text-white">
+                        <i data-lucide="crosshair" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- GPS SPEEDOMETER OVERLAY ON MAP -->
+            <div onclick="openSpeedOverviewModal()" class="absolute bottom-4 left-4 z-10 glass-panel p-3 rounded-2xl border border-white/20 shadow-2xl flex items-center gap-3 bg-slate-950/90 pointer-events-auto cursor-pointer hover:border-cyan-400/50 transition-all">
+                <div class="relative w-12 h-12 flex items-center justify-center rounded-full bg-slate-900 border-2 border-cyan-400 shadow-[0_0_15px_rgba(0,240,255,0.3)]">
+                    <span id="gps-speed-val" class="font-black text-xl text-cyan-400">0</span>
+                </div>
+                <div>
+                    <span id="lbl-gps-speed" class="text-[9px] font-black uppercase text-gray-400 tracking-widest block">GPS Fart</span>
+                    <span class="text-xs font-black text-white flex items-center gap-1">KM/H <i data-lucide="bar-chart-2" class="w-3 h-3 text-cyan-400"></i></span>
+                </div>
+            </div>
+        </div>
+
+    </main>
+    <!-- HASTIGHETSÖVERSIKT MODAL (SPEED ANALYTICS OVERVIEW) -->
+    <div id="speed-overview-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-6 border border-cyan-500/40 shadow-2xl relative bg-slate-950 space-y-4">
+            <button onclick="closeSpeedOverviewModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-white/5 p-1.5 rounded-full">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+
+            <div class="flex items-center gap-2.5 border-b border-white/10 pb-3">
+                <div class="p-2 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                    <i data-lucide="gauge" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h2 class="text-lg font-black text-white">Hastighetsöversikt & Statstik</h2>
+                    <p class="text-xs text-gray-400">Realtidsdata för ditt fordon under körningen</p>
+                </div>
+            </div>
+
+            <!-- Speed KPI Grid -->
+            <div class="grid grid-cols-3 gap-2.5">
+                <div class="bg-slate-900 p-3 rounded-2xl border border-white/10 text-center">
+                    <span class="text-[10px] uppercase font-bold text-gray-400 block">Nuvarande</span>
+                    <span id="stat-current-speed" class="text-2xl font-black text-cyan-400">0</span>
+                    <span class="text-[9px] font-bold text-gray-400 block">km/h</span>
+                </div>
+                <div class="bg-slate-900 p-3 rounded-2xl border border-white/10 text-center">
+                    <span class="text-[10px] uppercase font-bold text-gray-400 block">Toppfart</span>
+                    <span id="stat-max-speed" class="text-2xl font-black text-amber-400">74</span>
+                    <span class="text-[9px] font-bold text-gray-400 block">km/h</span>
+                </div>
+                <div class="bg-slate-900 p-3 rounded-2xl border border-white/10 text-center">
+                    <span class="text-[10px] uppercase font-bold text-gray-400 block">Snittfart</span>
+                    <span id="stat-avg-speed" class="text-2xl font-black text-emerald-400">42</span>
+                    <span class="text-[9px] font-bold text-gray-400 block">km/h</span>
+                </div>
+            </div>
+
+            <!-- Driving Metrics -->
+            <div class="p-3.5 bg-slate-900/90 border border-white/10 rounded-2xl flex items-center justify-between text-xs">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="navigation" class="w-4 h-4 text-orange-400"></i>
+                    <div>
+                        <span class="text-gray-400 block text-[10px]">Körd Sträcka</span>
+                        <span class="font-extrabold text-white text-xs">18.4 km</span>
+                    </div>
+                </div>
+                <div class="w-px h-8 bg-white/10"></div>
+                <div class="flex items-center gap-2">
+                    <i data-lucide="clock" class="w-4 h-4 text-purple-400"></i>
+                    <div>
+                        <span class="text-gray-400 block text-[10px]">Körtid</span>
+                        <span class="font-extrabold text-white text-xs">28 min</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOTTOM TAB NAVIGATION BAR -->
+    <nav class="fixed bottom-0 left-0 right-0 z-40 h-16 glass-panel border-t border-white/10 flex items-center justify-around px-2">
+        <button onclick="switchTab('feed')" id="nav-feed" class="flex flex-col items-center justify-center w-16 h-12 rounded-xl text-orange-400">
+            <i data-lucide="newspaper" class="w-5 h-5"></i>
+            <span id="lbl-nav-feed" class="text-[10px] font-bold mt-1">Flöde</span>
+        </button>
+
+        <button onclick="switchTab('events')" id="nav-events" class="flex flex-col items-center justify-center w-16 h-12 rounded-xl text-gray-400 hover:text-white">
+            <i data-lucide="flame" class="w-5 h-5"></i>
+            <span id="lbl-nav-events" class="text-[10px] font-bold mt-1">Meets</span>
+        </button>
+
+        <button onclick="toggleRightChat()" id="nav-side-chat" class="flex flex-col items-center justify-center w-16 h-12 rounded-xl text-gray-400 hover:text-white relative">
+            <i data-lucide="message-square" class="w-5 h-5"></i>
+            <span id="lbl-nav-chat" class="text-[10px] font-bold mt-1">Chat</span>
+            <span class="absolute top-1 right-3 w-2 h-2 rounded-full bg-orange-500 animate-ping"></span>
+        </button>
+
+        <button onclick="switchTab('map')" id="nav-map" class="flex flex-col items-center justify-center w-16 h-12 rounded-xl text-gray-400 hover:text-white">
+            <i data-lucide="map-pin" class="w-5 h-5"></i>
+            <span id="lbl-nav-map" class="text-[10px] font-bold mt-1">Karta</span>
+        </button>
+    </nav>
+
+    <!-- PERSONAL SOS EMERGENCY MODAL -->
+    <div id="sos-modal" class="fixed inset-0 z-50 bg-red-950/90 backdrop-blur-xl flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
+        <div class="glass-panel w-full max-w-sm rounded-3xl p-6 border-2 border-red-500 shadow-2xl relative bg-slate-950 text-center">
+            <button onclick="closeSOSModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-white/5 p-1.5 rounded-full">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+            <div class="w-16 h-16 rounded-full bg-red-600/30 border-2 border-red-500 flex items-center justify-center mx-auto mb-3 animate-pulse">
+                <i data-lucide="alert-triangle" class="w-9 h-9 text-red-500"></i>
+            </div>
+            <h2 class="text-2xl font-black text-white">EGET NÖDLARM (SOS)</h2>
+            <p class="text-xs text-red-300 mt-1 font-semibold">Har du krockat eller ramlat med MC/Moppe/Quad?</p>
+            <div class="space-y-3 text-left mt-4">
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase mb-1">Vad har hänt?</label>
+                    <select id="sos-incident-type" class="w-full bg-slate-900 border border-red-500/50 rounded-xl px-3 py-2 text-sm text-white">
+                        <option value="crash">💥 Krockat / Kört av vägen</option>
+                        <option value="fall">🏍️ Ramlat av MC / Moped / Quad</option>
+                        <option value="injury">🚑 Skadad - Behöver Akut Hjälp</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase mb-1">Meddelande</label>
+                    <input type="text" id="sos-message" placeholder="Beskriv plats eller skada..." class="w-full bg-slate-900 border border-red-500/50 rounded-xl px-3 py-2 text-sm text-white">
+                </div>
+                <button onclick="confirmPersonalSOS()" class="w-full py-3.5 rounded-2xl bg-red-600 text-white font-black text-sm shadow-xl hover:bg-red-500 transition">
+                    SKICKA NÖD-SOS NU! 🚨
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- INCIDENT ALERT MODAL -->
+    <div id="incident-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="glass-panel w-full max-w-sm rounded-3xl p-6 border border-rose-500/30 shadow-2xl relative bg-slate-950">
+            <button onclick="closeIncidentModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-white/5 p-1.5 rounded-full">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+            <h2 class="text-xl font-black text-white mb-1">Larma Trafikhändelse</h2>
+            <p class="text-[11px] text-gray-400 mb-4">Rapportera för alla i närheten</p>
+            <div class="space-y-3">
+                <select id="inc-type-select" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
+                    <option value="police">🚓 Poliskontroll / Radar</option>
+                    <option value="accident">💥 Olycka / Krock</option>
+                    <option value="traffic">🚗🚙 Tät Kö / Stopp</option>
+                    <option value="hazard">⚠️ Hinder På Vägen</option>
+                </select>
+                <input type="text" id="input-incident-desc" placeholder="Beskrivning (t.ex. Laser vid Sveavägen)" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
+                <button onclick="submitIncidentAlert()" class="w-full py-3 rounded-xl bg-rose-600 text-white font-black text-sm hover:bg-rose-500">PUBLICERA LARM 🚨</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CREATE EVENT MODAL -->
+    <div id="create-event-modal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="glass-panel w-full max-w-sm rounded-3xl p-6 border border-white/15 shadow-2xl relative bg-slate-950">
+            <button onclick="closeCreateEventModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-white/5 p-1.5 rounded-full">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+            <h2 class="text-xl font-black text-white mb-1">Skapa RideOut</h2>
+            <p class="text-xs text-gray-400 mb-4">Starta en samling för bilar eller tvåhjulingar.</p>
+            <div class="space-y-3">
+                <input type="text" id="input-event-title" placeholder="RideOut Namn" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
+                <input type="text" id="input-event-location" placeholder="Mötespunkt (t.ex. Brostugan)" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
+                <input type="text" id="input-event-time" placeholder="Tid (t.ex. 21:00 ikväll)" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
+                <select id="input-event-vehicle" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
+                    <option value="all">Alla Fordon</option>
+                    <option value="car">Endast Bilar 🚗</option>
+                    <option value="helmet">Endast MC/Moppe/Quad 🏍️</option>
+                </select>
+                <button onclick="createNewEvent()" class="w-full py-3 rounded-xl bg-orange-500 text-white font-black text-sm hover:bg-orange-600">PUBLICERA 🔥</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- USER CONFIG MODAL -->
+    <div id="user-config-modal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="glass-panel w-full max-w-sm rounded-3xl p-6 border border-white/15 shadow-2xl relative bg-slate-950">
+            <button onclick="closeUserConfigModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-white/5 p-1.5 rounded-full">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+            <h2 class="text-xl font-black text-white mb-1">Min Profil & Fordon</h2>
+            <div class="space-y-3 mt-4">
+
+                <!-- PROFILE PICTURE UPLOADER -->
+                <div class="flex items-center gap-3 p-3 bg-slate-900/90 border border-white/10 rounded-2xl">
+                    <div class="relative group">
+                        <div id="profile-avatar-preview" class="w-14 h-14 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-black text-lg border-2 border-cyan-400 overflow-hidden shadow-lg">
+                            <span id="profile-avatar-letter">N</span>
+                            <img id="profile-avatar-img" class="w-full h-full object-cover hidden" alt="Avatar">
+                        </div>
+                    </div>
+                    <div class="flex-1 space-y-1">
+                        <label class="block text-[11px] font-bold text-gray-300 uppercase">Profilbild</label>
+                        <div class="flex gap-2">
+                            <label class="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-bold cursor-pointer transition">
+                                📷 Välj bild
+                                <input type="file" id="input-profile-avatar" accept="image/*" onchange="handleAvatarUpload(event)" class="hidden">
+                            </label>
+                            <button type="button" onclick="resetAvatarImage()" class="px-2 py-1.5 bg-white/10 hover:bg-white/20 text-gray-400 hover:text-white rounded-xl text-xs font-bold transition">
+                                ❌ Ta bort
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase mb-1">Förarnamn</label>
+                    <input type="text" id="input-user-name" value="Användare" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase mb-1">Statusmeddelande</label>
+                    <input type="text" id="input-user-status" value="Redo för RideOut 🔥" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase mb-1">Fordonstyp</label>
+                    <select id="input-user-vehicle" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
+                        <option value="car">🚗 Bil (Visar Bil-ikon)</option>
+                        <option value="helmet">🏍️ MC / Moppe / Quad (Visar Hjälm)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase mb-1">Språk / Language</label>
+                    <select id="input-user-lang" onchange="changeAppLanguage(this.value)" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white font-bold">
+                        <option value="sv">🇸🇪 Svenska</option>
+                        <option value="en">🇬🇧 English</option>
+                        <option value="no">🇳🇴 Norsk</option>
+                        <option value="fi">🇫🇮 Suomi</option>
+                        <option value="de">🇩🇪 Deutsch</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase mb-1">Din Stad / Område</label>
+                    <select id="input-user-city" onchange="changeUserCity(this.value)" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white font-bold">
+                        <option value="stockholm">📍 Stockholm (Innerstad & Förorter)</option>
+                        <option value="goteborg">📍 Göteborg & Omnejd</option>
+                        <option value="malmo">📍 Malmö / Skåne</option>
+                        <option value="uppsala">📍 Uppsala</option>
+                        <option value="orebro">📍 Örebro</option>
+                    </select>
+                </div>
+                
+                <!-- Speed Visibility Setting -->
+                <div class="p-3 bg-slate-900/90 border border-white/10 rounded-xl space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="eye" class="w-4 h-4 text-cyan-400"></i>
+                            <span class="text-xs font-bold text-white">Visa Hastighet på Karta</span>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="input-user-speed-public" checked class="sr-only peer">
+                            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+                        </label>
+                    </div>
+                    <p id="speed-privacy-hint" class="text-[10px] text-gray-400">Offentlig: Andra förare ser din hastighet (km/h) i realtid.</p>
+                </div>
+
+                <!-- GPS Location Access Mode Setting -->
+                <div class="p-3 bg-slate-900/90 border border-white/10 rounded-xl space-y-2">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="navigation" class="w-4 h-4 text-emerald-400"></i>
+                        <span class="text-xs font-bold text-white">Platsbehörighet (GPS)</span>
+                    </div>
+                    <select id="input-location-mode" class="w-full bg-slate-800 border border-white/15 rounded-xl px-2.5 py-1.5 text-xs text-white">
+                        <option value="always">🟢 Alltid tillåt (Bakgrund & Kartspårning)</option>
+                        <option value="while_using" selected>🟡 Bara när appen används</option>
+                        <option value="never">🔴 Tillåt inte (Privatläge utan GPS)</option>
+                    </select>
+                </div>
+
+                <button onclick="saveUserProfile()" class="w-full py-3 rounded-xl bg-cyan-500 text-white font-black text-sm hover:bg-cyan-600">SPARA</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="fixed top-20 left-1/2 -translate-x-1/2 z-50 glass-panel px-4 py-2 rounded-2xl border border-orange-400/40 text-white text-xs font-bold shadow-2xl transition-all duration-300 -translate-y-12 opacity-0 pointer-events-none">
+        <span id="toast-msg">Notis</span>
+    </div>
+
+    <!-- JAVASCRIPT ENGINE -->
+    <script>
+        let map = null;
+        let currentFilter = 'all';
+        let activeSelectedRiderId = null;
+        let activeChatId = null;
+        let speedWatchId = null;
+        let filterOnlyNearby = false;
+
+        let maxSpeedTracked = 74;
+        let avgSpeedTracked = 42;
+
+        // Coordinates for regions
+        const cityCoords = {
+            stockholm: { lat: 59.3293, lng: 18.0686, name: "Stockholm" },
+            goteborg: { lat: 57.7088, lng: 11.9745, name: "Göteborg" },
+            malmo: { lat: 55.6050, lng: 13.0038, name: "Malmö" },
+            uppsala: { lat: 59.8588, lng: 17.6389, name: "Uppsala" },
+            orebro: { lat: 59.2753, lng: 15.2134, name: "Örebro" }
+        };
+
+        // Mock Feed Posts Data
+        const posts = [
+            { id: 'p1', author: 'Marcus_GTR', time: '10 min sedan', type: 'car', content: 'Grymt drag vid Barkarby ikväll! Tack alla som dök upp på spontancruisen 🏎️🔥' },
+            { id: 'p2', author: 'MoppeKungen', time: '25 min sedan', type: 'helmet', content: 'Samling vid Donken i stan kl 20:00! Alla 50cc, 125cc och A2 är välkomna 🏍️💨' },
+            { id: 'p3', author: 'Lisa_Turbo', time: '1 timme sedan', type: 'car', content: 'Någon som är sugen på en nattrunda längs kusten? 🌙 Vädret är perfekt!' }
+        ];
+
+        // Mock Planned Events Data
+        const eventsList = [
+            { id: 'e1', title: 'Stockholm Night Cruise 🌙', location: 'Barkarby Handelsplats', time: 'Idag 21:00', city: 'stockholm', attendees: 14, type: 'all' },
+            { id: 'e2', title: 'Moped & A2 Sommarträff 🏍️', location: 'Skogskyrkogården parkering', time: 'Lördag 15:00', city: 'stockholm', attendees: 28, type: 'helmet' },
+            { id: 'e3', title: 'Göteborg Tuner Meet 🚗', location: 'Avenyn', time: 'Söndag 18:00', city: 'goteborg', attendees: 19, type: 'car' }
+        ];
+
+        // Mock Active Riders Data
+        const riders = [
+            { id: 'r1', name: 'Alex_Rider', type: 'car', vehicleName: 'BMW M3 Competition', status: 'Gör sig redo för Barkarby 🏁', color: 'from-orange-500 to-amber-500', lat: 59.332, lng: 18.065, speed: 52, isSpeedPublic: true, city: 'stockholm' },
+            { id: 'r2', name: 'Moppe_Jonne', type: 'helmet', vehicleName: 'Yamaha Aerox 70cc', status: 'Ute och gliding! 💨', color: 'from-yellow-400 to-amber-500', lat: 59.325, lng: 18.075, speed: 45, isSpeedPublic: true, city: 'stockholm' },
+            { id: 'r3', name: 'Sofia_MC', type: 'helmet', vehicleName: 'Kawasaki Z900', status: 'Kaffestopp vid macken ☕', color: 'from-emerald-400 to-teal-500', lat: 59.335, lng: 18.058, speed: 0, isSpeedPublic: false, city: 'stockholm' }
+        ];
+
+        // Mock Direct Chat Messages
+        const chatMessages = {
+            'group_e1': [
+                { sender: 'Alex_Rider', text: 'Samling vid macken kl 21:00! 🏎️', time: '21:00', isMe: false },
+                { sender: 'Moppe_Jonne', text: 'Vi rullar dit nu från söder!', time: '21:02', isMe: false }
+            ],
+            'r1': [
+                { sender: 'Alex_Rider', text: 'Tjena! Är du på väg till träffen?', time: '20:45', isMe: false }
+            ],
+            'r2': [
+                { sender: 'Moppe_Jonne', text: 'Tjena, hänger du med ut och kör?', time: '20:50', isMe: false }
+            ],
+            'r3': [
+                { sender: 'Sofia_MC', text: 'Vi drar mot bulten imorgon bitti!', time: '19:12', isMe: false }
+            ]
+        };
+
+        let currentUser = {
+            id: 'user_me',
+            name: 'Nico_Speed',
+            type: 'car',
+            city: 'stockholm',
+            lang: 'sv',
+            color: 'from-cyan-500 to-blue-600',
+            status: 'Redo för RideOut! 🔥',
+            speed: 0,
+            avatarImg: null, // Base64 or URL for custom avatar image
+            isSpeedPublic: true,
+            locationPermission: 'while_using',
+            lat: 59.3293,
+            lng: 18.0686
+        };
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.app-screen').forEach(el => el.classList.remove('active'));
+            
+            const targetScreen = document.getElementById(`screen-${tabId}`);
+            if (targetScreen) {
+                targetScreen.classList.add('active');
+            }
+
+            const titles = {
+                feed: { title: 'RideOut Feed', sub: 'Gemenskap & Aktiviteter' },
+                events: { title: 'Kommande Meets', sub: 'Planerade träffar & cruising' },
+                map: { title: 'Live Karta', sub: 'Se förare & larm i realtid' }
+            };
+
+            if (titles[tabId]) {
+                const topTitle = document.getElementById('top-title');
+                const topSub = document.getElementById('top-sub');
+                if (topTitle) topTitle.innerText = titles[tabId].title;
+                if (topSub) topSub.innerText = titles[tabId].sub;
+            }
+
+            ['feed', 'events', 'map'].forEach(t => {
+                const navBtn = document.getElementById(`nav-${t}`);
+                if (navBtn) {
+                    if (t === tabId) {
+                        navBtn.classList.remove('text-gray-400');
+                        navBtn.classList.add('text-orange-400');
+                    } else {
+                        navBtn.classList.remove('text-orange-400');
+                        navBtn.classList.add('text-gray-400');
+                    }
+                }
+            });
+
+            if (tabId === 'map') {
+                setTimeout(() => {
+                    if (!map) {
+                        initMap();
+                    } else {
+                        map.invalidateSize();
+                    }
+                }, 100);
+            }
+        }
+
+        function toggleRightChat() {
+            const panel = document.getElementById('right-chat-panel');
+            if (panel) {
+                panel.classList.toggle('closed');
+            }
+        }
+
+        function openSpeedOverviewModal() {
+            const modal = document.getElementById('speed-overview-modal');
+            if (modal) {
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+            }
+        }
+
+        function closeSpeedOverviewModal() {
+            const modal = document.getElementById('speed-overview-modal');
+            if (modal) {
+                modal.classList.add('opacity-0', 'pointer-events-none');
+            }
+        }
+
+        function submitIncidentAlert() {
+            const typeSelect = document.getElementById('inc-type-select');
+            const descInput = document.getElementById('input-incident-desc');
+            if (!typeSelect || !descInput) return;
+
+            const incType = typeSelect.value;
+            const desc = descInput.value.trim() || 'Trafikhändelse rapporterad';
+
+            let titlePrefix = '⚠️ HINDER';
+            let bgStyle = 'badge-hazard';
+            let iconSymbol = '⚠️';
+
+            if (incType === 'police') {
+                titlePrefix = '🚓 POLISKONTROLL';
+                bgStyle = 'badge-car';
+                iconSymbol = '🚓';
+            } else if (incType === 'accident') {
+                titlePrefix = '💥 OLYCKA';
+                bgStyle = 'badge-hazard';
+                iconSymbol = '💥';
+            } else if (incType === 'traffic') {
+                titlePrefix = '🚗 TÄT KÖ';
+                bgStyle = 'badge-event';
+                iconSymbol = '🚗';
+            }
+
+            if (map) {
+                const labelText = `${titlePrefix}: ${desc}`;
+                const markerIcon = L.divIcon({
+                    html: `
+                        <div class="rider-marker-wrap">
+                            <div class="pulse-ring hazard-accident"></div>
+                            <div class="rider-label bg-rose-950 text-rose-300 font-extrabold border-rose-500">${labelText}</div>
+                            <div class="avatar-box bg-rose-600 border-2 border-white">
+                                <span class="text-white font-black text-xs">${iconSymbol}</span>
+                            </div>
+                        </div>
+                    `,
+                    className: '',
+                    iconSize: [50, 50],
+                    iconAnchor: [25, 25]
+                });
+
+                L.marker([currentUser.lat, currentUser.lng], { icon: markerIcon })
+                    .addTo(map)
+                    .bindPopup(`<b style="color:black;">${labelText}</b><br>Rapporterad av ${currentUser.name}`);
+            }
+
+            closeIncidentModal();
+            showToast(`Larm publicerat: ${titlePrefix}! 🚨`);
+        }
+
+        function handleAvatarUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentUser.avatarImg = e.target.result;
+                updateAvatarUI();
+                showToast('Profilbild uppladdad! 📸');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function resetAvatarImage() {
+            currentUser.avatarImg = null;
+            document.getElementById('input-profile-avatar').value = '';
+            updateAvatarUI();
+            showToast('Profilbild återställd!');
+        }
+
+        function updateAvatarUI() {
+            const imgEl = document.getElementById('profile-avatar-img');
+            const letterEl = document.getElementById('profile-avatar-letter');
+            
+            if (currentUser.avatarImg) {
+                if (imgEl) {
+                    imgEl.src = currentUser.avatarImg;
+                    imgEl.classList.remove('hidden');
+                }
+                if (letterEl) letterEl.classList.add('hidden');
+            } else {
+                if (imgEl) imgEl.classList.add('hidden');
+                if (letterEl) {
+                    letterEl.innerText = (currentUser.name || 'N').charAt(0).toUpperCase();
+                    letterEl.classList.remove('hidden');
+                }
+            }
+        }
+
+        function createCustomMarkerIcon(type, labelName, colorGradientClass, isSelf = false, speedVal = 0, isSpeedPublic = true, avatarImg = null) {
+            let badgeIcon = type === 'car' ? '🚗' : '🏍️';
+            let badgeClass = type === 'car' ? 'badge-car' : 'badge-helmet';
+            let pulseClass = type === 'car' ? 'car' : 'helmet';
+            
+            let speedBadge = '';
+            if (isSpeedPublic) {
+                speedBadge = `<span class="ml-1 text-[9px] text-cyan-300 font-black">(${speedVal} km/h)</span>`;
+            } else {
+                speedBadge = `<span class="ml-1 text-[9px] text-gray-400 font-semibold">(Privat)</span>`;
+            }
+
+            const avatarContent = avatarImg 
+                ? `<img src="${avatarImg}" class="w-full h-full object-cover rounded-full" />`
+                : `<span class="text-white font-black text-xs">${labelName.charAt(0).toUpperCase()}</span>`;
+
+            const html = `
+                <div class="rider-marker-wrap">
+                    <div class="pulse-ring ${pulseClass}"></div>
+                    <div class="rider-label">${labelName}${speedBadge}</div>
+                    <div class="avatar-box bg-gradient-to-tr ${colorGradientClass} ${isSelf ? 'ring-4 ring-cyan-400' : ''} overflow-hidden">
+                        ${avatarContent}
+                        <div class="vehicle-badge ${badgeClass}">${badgeIcon}</div>
+                    </div>
+                </div>
+            `;
+
+            return L.divIcon({ html, className: '', iconSize: [50, 50], iconAnchor: [25, 25] });
+        }
+
+        function openUserConfigModal() {
+            const el = document.getElementById('user-config-modal');
+            if (!el) return;
+            
+            document.getElementById('input-user-name').value = currentUser.name;
+            document.getElementById('input-user-status').value = currentUser.status;
+            document.getElementById('input-user-vehicle').value = currentUser.type;
+            document.getElementById('input-user-lang').value = currentUser.lang || 'sv';
+            document.getElementById('input-user-city').value = currentUser.city || 'stockholm';
+            document.getElementById('input-location-mode').value = currentUser.locationPermission || 'while_using';
+
+            updateAvatarUI();
+
+            el.classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        function saveUserProfile() {
+            const name = document.getElementById('input-user-name').value.trim();
+            const status = document.getElementById('input-user-status').value.trim();
+            const vehicle = document.getElementById('input-user-vehicle').value;
+            const lang = document.getElementById('input-user-lang').value;
+            const city = document.getElementById('input-user-city').value;
+
+            if (name) currentUser.name = name;
+            if (status) currentUser.status = status;
+            currentUser.type = vehicle;
+            currentUser.city = city;
+            currentUser.lang = lang;
+
+            document.getElementById('header-driver-name').innerText = currentUser.name;
+
+            if (currentUser.marker && map) {
+                currentUser.marker.setIcon(createCustomMarkerIcon(currentUser.type, currentUser.name, currentUser.color, true, currentUser.speed, currentUser.isSpeedPublic, currentUser.avatarImg));
+            }
+
+            closeUserConfigModal();
+            const dict = translations[currentUser.lang] || translations.sv;
+            showToast(dict.saveToast);
+        }
+
+        function closeUserConfigModal() {
+            const el = document.getElementById('user-config-modal');
+            if (el) el.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        function changeUserCity(cityKey) {
+            currentUser.city = cityKey;
+            if (cityCoords[cityKey]) {
+                currentUser.lat = cityCoords[cityKey].lat;
+                currentUser.lng = cityCoords[cityKey].lng;
+                if (map) {
+                    map.flyTo([currentUser.lat, currentUser.lng], 13);
+                    if (currentUser.marker) currentUser.marker.setLatLng([currentUser.lat, currentUser.lng]);
+                }
+            }
+            applyFilters();
+            renderEvents();
+        }
+
+        function toggleNearbyFilter() {
+            filterOnlyNearby = !filterOnlyNearby;
+            const btn = document.getElementById('btn-nearby-toggle');
+            const lbl = document.getElementById('nearby-label');
+            
+            if (filterOnlyNearby) {
+                const cityName = cityCoords[currentUser.city]?.name || 'Närheten';
+                if (btn) btn.className = 'glass-button px-3 py-2 rounded-2xl flex items-center gap-1 text-xs font-bold text-orange-400 border-orange-500/50 bg-orange-500/20';
+                if (lbl) lbl.innerText = `Bara ${cityName}`;
+                showToast(`Visar endast riders & meets i ${cityName}`);
+            } else {
+                if (btn) btn.className = 'glass-button px-3 py-2 rounded-2xl flex items-center gap-1 text-xs font-bold text-gray-300 hover:text-white';
+                if (lbl) lbl.innerText = 'Alla Områden';
+                showToast('Visar alla områden');
+            }
+            applyFilters();
+            renderEvents();
+        }
+
+        // Comprehensive multi-language dictionary for full app translation
+        const translations = {
+            sv: {
+                saveToast: "Profil sparad! 🇸🇪",
+                feedTitle: "RideOut Feed",
+                feedSub: "Gemenskap & Aktiviteter",
+                meetsTitle: "Kommande Meets",
+                meetsSub: "Planerade träffar & cruising",
+                mapTitle: "Live Karta",
+                mapSub: "Se förare & larm i realtid",
+                speedBtn: "Hastighet",
+                dmTitle: "Direktmeddelanden",
+                dmSub: "Chatta med förare i närheten",
+                recentEvents: "Senaste Händelser",
+                reportIncident: "Larma Händelse",
+                messagesHeader: "Meddelanden",
+                directGroupsBadge: "Direkt & Grupper",
+                upcomingMeets: "Kommande RideOuts",
+                upcomingMeetsSub: "Hitta cruisingar för bilar, MC, mopeder och fyrhjulningar.",
+                btnCreate: "Skapa",
+                btnLarma: "Larma",
+                gpsSpeedLabel: "GPS Fart",
+                navFeed: "Flöde",
+                navEvents: "Meets",
+                navChat: "Chat",
+                navMap: "Karta",
+                filterAll: "Alla",
+                filterCars: "🚗 Bilar",
+                filterHelmets: "🏍️ MC/Moppe/Quad",
+                driverTitle: "Förare",
+                noMeets: "Inga planerade RideOuts hittades i ditt valda område."
+            },
+            en: {
+                saveToast: "Profile saved! 🇬🇧",
+                feedTitle: "RideOut Feed",
+                feedSub: "Community & Activities",
+                meetsTitle: "Upcoming Meets",
+                meetsSub: "Planned meets & cruising",
+                mapTitle: "Live Map",
+                mapSub: "See drivers & alerts in real time",
+                speedBtn: "Speed",
+                dmTitle: "Direct Messages",
+                dmSub: "Chat with nearby riders",
+                recentEvents: "Recent Events",
+                reportIncident: "Report Alert",
+                messagesHeader: "Messages",
+                directGroupsBadge: "Direct & Groups",
+                upcomingMeets: "Upcoming RideOuts",
+                upcomingMeetsSub: "Find cruises for cars, bikes, mopeds and quads.",
+                btnCreate: "Create",
+                btnLarma: "Alert",
+                gpsSpeedLabel: "GPS Speed",
+                navFeed: "Feed",
+                navEvents: "Meets",
+                navChat: "Chat",
+                navMap: "Map",
+                filterAll: "All",
+                filterCars: "🚗 Cars",
+                filterHelmets: "🏍️ Bikes/Mopeds",
+                driverTitle: "Driver",
+                noMeets: "No planned RideOuts found in your selected area."
+            },
+            no: {
+                saveToast: "Profil lagret! 🇳🇴",
+                feedTitle: "RideOut Strøm",
+                feedSub: "Fellesskap og aktiviteter",
+                meetsTitle: "Kommende Møter",
+                meetsSub: "Planlagte treff og cruising",
+                mapTitle: "Kart Live",
+                mapSub: "Se førere og varsler i sanntid",
+                speedBtn: "Hastighet",
+                dmTitle: "Direktemeldinger",
+                dmSub: "Chat med førere i nærheten",
+                recentEvents: "Siste Händelser",
+                reportIncident: "Meld fra",
+                messagesHeader: "Meldinger",
+                directGroupsBadge: "Direkte & Grupper",
+                upcomingMeets: "Kommende RideOuts",
+                upcomingMeetsSub: "Finn treff for biler, MC, moped og quad.",
+                btnCreate: "Opprett",
+                btnLarma: "Varsle",
+                gpsSpeedLabel: "GPS Fart",
+                navFeed: "Fløy",
+                navEvents: "Treff",
+                navChat: "Chat",
+                navMap: "Kart",
+                filterAll: "Alle",
+                filterCars: "🚗 Biler",
+                filterHelmets: "🏍️ MC/Moped",
+                driverTitle: "Fører",
+                noMeets: "Ingen planlagte RideOuts funnet i ditt valgte område."
+            },
+            fi: {
+                saveToast: "Profiili tallennettu! 🇫🇮",
+                feedTitle: "RideOut Syöte",
+                feedSub: "Yhteisö & Aktiviteetit",
+                meetsTitle: "Tulevat Tapaamiset",
+                meetsSub: "Suunnitellut kokoontumiset",
+                mapTitle: "Live Kartta",
+                mapSub: "Katso kuljettajat ja hälytykset",
+                speedBtn: "Nopeus",
+                dmTitle: "Suoraviestit",
+                dmSub: "Keskustele läheisten kuljettajien kanssa",
+                recentEvents: "Viimeisimmät Tapahtumat",
+                reportIncident: "Tee Hälytys",
+                messagesHeader: "Viestit",
+                directGroupsBadge: "Yksityis & Ryhmät",
+                upcomingMeets: "Tulevat RideOutit",
+                upcomingMeetsSub: "Löydä miitit autoille, moottoripyörille ja mopoille.",
+                btnCreate: "Luo",
+                btnLarma: "Hälytä",
+                gpsSpeedLabel: "GPS Nopeus",
+                navFeed: "Syöte",
+                navEvents: "Miitit",
+                navChat: "Chat",
+                navMap: "Kartta",
+                filterAll: "Kaikki",
+                filterCars: "🚗 Autot",
+                filterHelmets: "🏍️ MP/Mopot",
+                driverTitle: "Kuljettaja",
+                noMeets: "Suunniteltuja RideOuteja ei löytynyt valitultasi alueelta."
+            },
+            de: {
+                saveToast: "Profil gespeichert! 🇩🇪",
+                feedTitle: "RideOut Feed",
+                feedSub: "Community & Aktivitäten",
+                meetsTitle: "Kommende Treffen",
+                meetsSub: "Geplante Ausfahrten & Treffen",
+                mapTitle: "Live Karte",
+                mapSub: "Fahrer & Warnungen in Echtzeit",
+                speedBtn: "Tempo",
+                dmTitle: "Direktnachrichten",
+                dmSub: "Chatte mit Fahrern in der Nähe",
+                recentEvents: "Neueste Ereignisse",
+                reportIncident: "Meldung erstellen",
+                messagesHeader: "Nachrichten",
+                directGroupsBadge: "Direkt & Gruppen",
+                upcomingMeets: "Anstehende RideOuts",
+                upcomingMeetsSub: "Finde Treffen für Autos, Motorräder & Mopeds.",
+                btnCreate: "Erstellen",
+                btnLarma: "Warnen",
+                gpsSpeedLabel: "GPS Tempo",
+                navFeed: "Feed",
+                navEvents: "Treffen",
+                navChat: "Chat",
+                navMap: "Karte",
+                filterAll: "Alle",
+                filterCars: "🚗 Autos",
+                filterHelmets: "🏍️ Bikes/Mopeds",
+                driverTitle: "Fahrer",
+                noMeets: "Keine geplanten RideOuts in deiner Region gefunden."
+            }
+        };
+
+        function changeAppLanguage(langKey) {
+            currentUser.lang = langKey;
+            applyTranslations();
+        }
+
+        function applyTranslations() {
+            const lang = currentUser.lang || 'sv';
+            const dict = translations[lang] || translations.sv;
+
+            // Element mapping
+            const mapElements = {
+                'btn-hdr-speed': dict.speedBtn,
+                'dm-title': dict.dmTitle,
+                'dm-sub': dict.dmSub,
+                'txt-recent-events': dict.recentEvents,
+                'txt-report-incident-link': dict.reportIncident,
+                'txt-direct-groups-badge': dict.directGroupsBadge,
+                'txt-upcoming-meets': dict.upcomingMeets,
+                'txt-upcoming-meets-sub': dict.upcomingMeetsSub,
+                'btn-create-event': dict.btnCreate,
+                'btn-map-larma': dict.btnLarma,
+                'lbl-gps-speed': dict.gpsSpeedLabel,
+                'lbl-nav-feed': dict.navFeed,
+                'lbl-nav-events': dict.navEvents,
+                'lbl-nav-chat': dict.navChat,
+                'lbl-nav-map': dict.navMap,
+                'filter-all': dict.filterAll,
+                'filter-car': dict.filterCars,
+                'filter-helmet': dict.filterHelmets
+            };
+
+            for (const [id, text] of Object.entries(mapElements)) {
+                const el = document.getElementById(id);
+                if (el) el.innerText = text;
+            }
+
+            // Update Header titles dynamically
+            const activeScreen = document.querySelector('.app-screen.active')?.id.replace('screen-', '') || 'feed';
+            switchTab(activeScreen);
+            renderEvents();
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.app-screen').forEach(el => el.classList.remove('active'));
+            
+            const targetScreen = document.getElementById(`screen-${tabId}`);
+            if (targetScreen) {
+                targetScreen.classList.add('active');
+            }
+
+            const dict = translations[currentUser.lang || 'sv'] || translations.sv;
+
+            const titles = {
+                feed: { title: dict.feedTitle, sub: dict.feedSub },
+                events: { title: dict.meetsTitle, sub: dict.meetsSub },
+                map: { title: dict.mapTitle, sub: dict.mapSub }
+            };
+
+            if (titles[tabId]) {
+                const topTitle = document.getElementById('top-title');
+                const topSub = document.getElementById('top-sub');
+                if (topTitle) topTitle.innerText = titles[tabId].title;
+                if (topSub) topSub.innerText = titles[tabId].sub;
+            }
+
+            ['feed', 'events', 'map'].forEach(t => {
+                const navBtn = document.getElementById(`nav-${t}`);
+                if (navBtn) {
+                    if (t === tabId) {
+                        navBtn.classList.remove('text-gray-400');
+                        navBtn.classList.add('text-orange-400');
+                    } else {
+                        navBtn.classList.remove('text-orange-400');
+                        navBtn.classList.add('text-gray-400');
+                    }
+                }
+            });
+
+            if (tabId === 'map') {
+                setTimeout(() => {
+                    if (!map) {
+                        initMap();
+                    } else {
+                        map.invalidateSize();
+                    }
+                }, 100);
+            }
+        }
+
+        function saveUserProfile() {
+            const name = document.getElementById('input-user-name').value.trim();
+            const status = document.getElementById('input-user-status').value.trim();
+            const vehicle = document.getElementById('input-user-vehicle').value;
+            const lang = document.getElementById('input-user-lang').value;
+            const city = document.getElementById('input-user-city').value;
+
+            if (name) currentUser.name = name;
+            if (status) currentUser.status = status;
+            currentUser.type = vehicle;
+            currentUser.city = city;
+            currentUser.lang = lang;
+
+            document.getElementById('header-driver-name').innerText = currentUser.name;
+
+            if (currentUser.marker && map) {
+                currentUser.marker.setIcon(createCustomMarkerIcon(currentUser.type, currentUser.name, currentUser.color, true, currentUser.speed, currentUser.isSpeedPublic, currentUser.avatarImg));
+            }
+
+            applyTranslations();
+            closeUserConfigModal();
+            const dict = translations[currentUser.lang] || translations.sv;
+            showToast(dict.saveToast);
+        }
+
+        function renderEvents() {
+            const container = document.getElementById('events-list-container');
+            if (!container) return;
+
+            const dict = translations[currentUser.lang || 'sv'] || translations.sv;
+            let html = '';
+            const filteredEvents = eventsList.filter(e => !filterOnlyNearby || e.city === currentUser.city);
+
+            if (filteredEvents.length === 0) {
+                html = `<div class="p-6 text-center text-gray-400 text-xs font-semibold">${dict.noMeets}</div>`;
+            } else {
+                filteredEvents.forEach(e => {
+                    html += `
+                        <div class="glass-panel p-4 rounded-2xl border border-white/15 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <h3 class="font-extrabold text-sm text-white">${e.title}</h3>
+                                <span class="text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full border border-orange-500/30">${e.attendees} Riders</span>
+                            </div>
+                            <p class="text-xs text-gray-300">📍 ${e.location} • ⏰ ${e.time}</p>
+                        </div>
+                    `;
+                });
+            }
+
+            container.innerHTML = html;
+        }
+
+        window.onload = function() {
+            if (window.lucide) lucide.createIcons();
+            const drvName = document.getElementById('header-driver-name');
+            if (drvName) drvName.innerText = currentUser.name || "Förare";
+            applyTranslations();
+            renderFeed();
+            renderEvents();
+            renderSideDirectChats();
+        };
+
+        // Render feed posts in the feed view
+        function renderFeed() {
+            const feedContainer = document.getElementById('feed-posts-container');
+            if (!feedContainer) return;
+
+            let html = '';
+            posts.forEach(post => {
+                const badgeIcon = post.type === 'car' ? '🚗' : '🏍️';
+                html += `
+                    <div class="glass-panel p-4 rounded-3xl border border-white/15 space-y-2 bg-slate-900/80">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-black text-xs border border-cyan-400">
+                                    ${post.author.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <h4 class="font-extrabold text-white text-xs flex items-center gap-1.5">
+                                        ${post.author} <span>${badgeIcon}</span>
+                                    </h4>
+                                    <span class="text-[10px] text-gray-400">${post.time}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-200 leading-relaxed">${post.content}</p>
+                    </div>
+                `;
+            });
+
+            feedContainer.innerHTML = html;
+        }
+
+        // Render DMs in the side drawer and inline box
+        function renderSideDirectChats() {
+            const sideList = document.getElementById('side-direct-chats-list');
+            const feedList = document.getElementById('feed-inline-chats-list');
+
+            let sideHtml = '';
+            let feedHtml = '';
+
+            riders.forEach(r => {
+                const badgeIcon = r.type === 'car' ? '🚗' : '🏍️';
+                const lastMsgObj = (chatMessages[r.id] && chatMessages[r.id].length > 0) 
+                    ? chatMessages[r.id][chatMessages[r.id].length - 1] 
+                    : { text: r.status, time: '' };
+
+                sideHtml += `
+                    <div onclick="openSideChatConversation('${r.id}', '${r.name}', '${r.vehicleName}', '${r.color}')" class="glass-button p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:border-cyan-400/50">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-tr ${r.color} flex items-center justify-center text-white font-bold text-xs">
+                                ${r.name.charAt(0)}
+                            </div>
+                            <div>
+                                <span class="font-bold text-white text-xs block flex items-center gap-1">${r.name} <span>${badgeIcon}</span></span>
+                                <span class="text-[10px] text-gray-400 block truncate max-w-[140px]">${lastMsgObj.text}</span>
+                            </div>
+                        </div>
+                        <span class="text-[9px] text-gray-500">${lastMsgObj.time}</span>
+                    </div>
+                `;
+
+                feedHtml += `
+                    <div onclick="toggleRightChat(); openSideChatConversation('${r.id}', '${r.name}', '${r.vehicleName}', '${r.color}')" class="glass-button p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:border-cyan-400/50">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-tr ${r.color} flex items-center justify-center text-white font-bold text-xs">
+                                ${r.name.charAt(0)}
+                            </div>
+                            <div>
+                                <span class="font-bold text-white text-xs block">${r.name}</span>
+                                <span class="text-[10px] text-gray-400 block truncate max-w-[140px]">${lastMsgObj.text}</span>
+                            </div>
+                        </div>
+                        <span class="text-[9px] text-gray-500">${lastMsgObj.time}</span>
+                    </div>
+                `;
+            });
+
+            if (sideList) sideList.innerHTML = sideHtml;
+            if (feedList) feedList.innerHTML = feedHtml;
+        }
+
+        function openSideChatConversation(chatId, name, subText, colorClass) {
+            activeChatId = chatId;
+            document.getElementById('side-chat-list-view').classList.add('hidden');
+            document.getElementById('side-chat-convo-view').classList.remove('hidden');
+
+            document.getElementById('side-convo-title').innerText = name;
+            document.getElementById('side-convo-sub').innerText = subText;
+            
+            const avatarEl = document.getElementById('side-convo-avatar');
+            if (avatarEl) {
+                avatarEl.className = `w-8 h-8 rounded-full bg-gradient-to-tr ${colorClass} flex items-center justify-center text-white font-bold text-xs`;
+                avatarEl.innerText = name.charAt(0).toUpperCase();
+            }
+
+            renderSideMessages();
+        }
+
+        function closeSideChatConversation() {
+            activeChatId = null;
+            document.getElementById('side-chat-convo-view').classList.add('hidden');
+            document.getElementById('side-chat-list-view').classList.remove('hidden');
+        }
+
+        function renderSideMessages() {
+            if (!activeChatId) return;
+            const container = document.getElementById('side-messages-container');
+            if (!container) return;
+
+            const msgs = chatMessages[activeChatId] || [];
+            let html = '';
+
+            msgs.forEach(m => {
+                const isMe = m.isMe || m.sender === currentUser.name;
+                html += `
+                    <div class="flex ${isMe ? 'justify-end' : 'justify-start'}">
+                        <div class="max-w-[80%] rounded-2xl px-3 py-2 ${isMe ? 'bg-orange-500 text-white rounded-br-none' : 'bg-slate-800 text-gray-200 rounded-bl-none border border-white/10'}">
+                            ${!isMe ? `<span class="block text-[9px] font-bold text-orange-400 mb-0.5">${m.sender}</span>` : ''}
+                            <p class="text-xs">${m.text}</p>
+                            <span class="block text-[8px] ${isMe ? 'text-white/70' : 'text-gray-400'} text-right mt-1">${m.time}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function sendSideMessage() {
+            const input = document.getElementById('side-chat-input');
+            if (!input || !activeChatId) return;
+            const text = input.value.trim();
+            if (!text) return;
+
+            if (!chatMessages[activeChatId]) {
+                chatMessages[activeChatId] = [];
+            }
+
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+            chatMessages[activeChatId].push({
+                sender: currentUser.name,
+                text: text,
+                time: timeStr,
+                isMe: true
+            });
+
+            input.value = '';
+            renderSideMessages();
+            renderSideDirectChats();
+        }
+    </script>
+</body>
+</html>
