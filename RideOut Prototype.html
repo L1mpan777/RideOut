@@ -6,36 +6,10 @@
     <title>RideOut - Social Rider Network & Map</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Leaflet CSS & JS -->
+
+    <!-- Leaflet CSS & JS (Loaded in head to prevent 'L is not defined' error) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Plus Jakarta Sans', 'sans-serif'],
-                    },
-                    colors: {
-                        ride: {
-                            yellow: '#FFDF00',
-                            orange: '#FF5500',
-                            cyan: '#00F0FF',
-                            purple: '#A855F7',
-                            dark: '#06080d',
-                            card: 'rgba(16, 20, 30, 0.88)',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
 
     <style>
         body, html {
@@ -181,6 +155,19 @@
             display: block;
         }
 
+        /* Speedometer Realistic Styling */
+        .speedo-dial-glow {
+            box-shadow: 0 0 50px rgba(0, 240, 255, 0.15), inset 0 0 35px rgba(0, 0, 0, 0.95);
+        }
+
+        /* Speedometer Dynamic Color Themes */
+        .speedo-theme-cyan { --speedo-color: #00F0FF; --speedo-glow: rgba(0, 240, 255, 0.35); }
+        .speedo-theme-red { --speedo-color: #FF2A55; --speedo-glow: rgba(255, 42, 85, 0.35); }
+        .speedo-theme-green { --speedo-color: #10B981; --speedo-glow: rgba(16, 185, 129, 0.35); }
+        .speedo-theme-amber { --speedo-color: #F59E0B; --speedo-glow: rgba(245, 158, 11, 0.35); }
+        .speedo-theme-purple { --speedo-color: #A855F7; --speedo-glow: rgba(168, 85, 247, 0.35); }
+        .speedo-theme-white { --speedo-color: #E2E8F0; --speedo-glow: rgba(226, 232, 240, 0.35); }
+
         /* Right Side Chat Drawer */
         #right-chat-panel {
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -192,17 +179,114 @@
 </head>
 <body class="h-full w-full relative select-none bg-slate-950 overflow-hidden">
 
+    <!-- AUTHENTICATION / LOGIN OVERLAY SCREEN -->
+    <div id="auth-screen" class="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-6 sm:p-8 border border-white/15 shadow-2xl relative bg-slate-950/90 text-center space-y-6">
+            <!-- App Logo Header (Updated with custom RideOut peak logo & slogan) -->
+            <div class="flex flex-col items-center justify-center space-y-3">
+                <div class="p-4 bg-slate-900/90 rounded-3xl border border-white/20 shadow-2xl inline-flex flex-col items-center justify-center w-full max-w-[280px]">
+                    <svg class="w-full h-auto max-h-36 text-white" viewBox="0 0 320 180" fill="none" stroke="currentColor">
+                        <!-- Peak / Mountain Brush Stroke -->
+                        <path d="M70 110 L125 45 M125 45 L160 90 L175 60 L220 110" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+                        
+                        <!-- Main RideOut Brush Text -->
+                        <text x="160" y="145" text-anchor="middle" fill="currentColor" font-family="'Plus Jakarta Sans', sans-serif" font-weight="900" font-style="italic" font-size="52" letter-spacing="-1.5">RideOut</text>
+                        
+                        <!-- Curved Brush Underline Swoosh -->
+                        <path d="M45 160 Q 160 176 275 158" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
+                    </svg>
+                </div>
+                <p id="auth-sub-header" class="text-xs text-gray-400 font-medium pt-1">Skapa ett konto först för att få tillgång till mappen och våra funktioner</p>
+            </div>
+
+            <!-- Login / Signup Form -->
+            <form onsubmit="handleAuthSubmit(event)" class="space-y-4 text-left">
+                <!-- Toggle Mode Selector -->
+                <div class="grid grid-cols-2 gap-1 p-1 bg-slate-900 rounded-2xl border border-white/10 text-xs font-bold">
+                    <button type="button" id="btn-auth-mode-register" onclick="setAuthMode('register')" class="py-2 rounded-xl bg-orange-500 text-white transition">Skapa konto</button>
+                    <button type="button" id="btn-auth-mode-login" onclick="setAuthMode('login')" class="py-2 rounded-xl text-gray-400 hover:text-white transition">Logga in</button>
+                </div>
+
+                <!-- Registration specific field: Driver Username -->
+                <div id="auth-username-field" class="space-y-1">
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase">Förarnamn / Rider Tag</label>
+                    <div class="relative">
+                        <input type="text" id="auth-input-username" placeholder="t.ex. Turbo_Marcus" class="w-full bg-slate-900 border border-white/15 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500">
+                        <i data-lucide="user" class="w-4 h-4 text-gray-500 absolute left-3 top-3"></i>
+                    </div>
+                </div>
+
+                <!-- Email Address -->
+                <div class="space-y-1">
+                    <label id="auth-email-label" class="block text-[11px] font-bold text-gray-300 uppercase">E-post</label>
+                    <div class="relative">
+                        <input type="email" id="auth-input-email" required placeholder="namn@rider.se" class="w-full bg-slate-900 border border-white/15 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500">
+                        <i data-lucide="mail" class="w-4 h-4 text-gray-500 absolute left-3 top-3"></i>
+                    </div>
+                </div>
+
+                <!-- Password -->
+                <div class="space-y-1">
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase">Lösenord</label>
+                    <div class="relative">
+                        <input type="password" id="auth-input-password" required placeholder="••••••••" class="w-full bg-slate-900 border border-white/15 rounded-xl pl-9 pr-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500">
+                        <i data-lucide="lock" class="w-4 h-4 text-gray-500 absolute left-3 top-3"></i>
+                    </div>
+                </div>
+
+                <!-- Registration specific field: Vehicle Selection -->
+                <div id="auth-vehicle-field" class="space-y-1">
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase">Ditt Huvudfordon</label>
+                    <select id="auth-input-vehicle" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500">
+                        <option value="car">🚗 Bil (Visar Bil-ikon på kartan)</option>
+                        <option value="helmet">🏍️ MC / Moppe / Quad (Visar Hjälm-ikon)</option>
+                    </select>
+                </div>
+
+                <!-- Registration specific field: City Selection -->
+                <div id="auth-city-field" class="space-y-1">
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase">Välj Din Stad / Region</label>
+                    <select id="auth-input-city" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500">
+                        <option value="stockholm">📍 Stockholm</option>
+                        <option value="goteborg">📍 Göteborg</option>
+                        <option value="malmo">📍 Malmö</option>
+                        <option value="uppsala">📍 Uppsala</option>
+                        <option value="orebro">📍 Örebro</option>
+                    </select>
+                </div>
+
+                <!-- Remember Me Checkbox -->
+                <div class="flex items-center justify-between pt-1">
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="auth-remember-me" checked class="w-4 h-4 rounded border-white/20 bg-slate-900 text-orange-500 focus:ring-orange-500">
+                        <span class="text-xs text-gray-300 font-semibold">Håll mig inloggad (Spara inloggning)</span>
+                    </label>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" id="btn-auth-submit" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-black text-sm shadow-xl shadow-orange-500/20 hover:brightness-110 transition">
+                    SKAPA KONTO & FORTSÄTT 🚀
+                </button>
+            </form>
+
+            <!-- Guest Quick Access -->
+            <div class="pt-2 border-t border-white/10">
+                <button onclick="loginAsGuest()" class="text-xs text-gray-400 hover:text-cyan-400 font-bold transition flex items-center justify-center gap-1.5 mx-auto">
+                    <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i> Fortsätt som gästförare
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- MAIN APP HEADER -->
     <header class="fixed top-0 left-0 right-0 z-30 h-16 glass-panel border-b border-white/10 px-4 flex items-center justify-between">
         <div class="flex items-center space-x-3">
-            <div class="flex flex-col items-center justify-center p-1.5 px-3 bg-black/95 rounded-xl border border-white/20 shadow-lg">
-                <svg class="w-8 h-5 text-white" viewBox="0 0 32 20" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 16L19 7L29 18H2" stroke="rgba(255, 255, 255, 0.35)"/>
-                    <path d="M2 18L11 3L22 18H2" stroke="#FFFFFF" fill="rgba(255, 255, 255, 0.12)"/>
-                    <circle cx="7.5" cy="18" r="1.8" fill="#FFFFFF"/>
-                    <circle cx="18.5" cy="18" r="1.8" fill="#FFFFFF"/>
+            <div class="flex items-center justify-center p-1.5 px-2.5 bg-slate-900 rounded-xl border border-white/20 shadow-lg">
+                <svg class="w-16 h-7 text-white" viewBox="0 0 320 180" fill="none" stroke="currentColor">
+                    <path d="M70 110 L125 45 M125 45 L160 90 L175 60 L220 110" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+                    <text x="160" y="145" text-anchor="middle" fill="currentColor" font-family="'Plus Jakarta Sans', sans-serif" font-weight="900" font-style="italic" font-size="54">RideOut</text>
+                    <path d="M45 160 Q 160 176 275 158" stroke="currentColor" stroke-width="9" stroke-linecap="round"/>
                 </svg>
-                <h1 class="font-black text-[10px] tracking-widest text-white">RIDE<span class="text-gray-400">OUT</span></h1>
             </div>
             <div>
                 <h2 id="top-title" class="font-black text-sm text-white">RideOut Feed</h2>
@@ -211,51 +295,278 @@
         </div>
 
         <div class="flex items-center gap-2">
+            <!-- Ghost Mode Badge Indicator (Shown when active) -->
+            <div id="hdr-ghost-badge" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-900/60 border border-purple-500/50 text-[11px] font-extrabold text-purple-300 animate-pulse">
+                <span>👻</span> <span class="hidden md:inline">Spökläge Aktivt</span>
+            </div>
+
             <!-- Top Right Driver Indicator -->
             <div id="header-driver-tag" class="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-900 border border-white/15 text-xs font-bold text-gray-300">
                 <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 <span id="header-driver-name" class="text-white font-extrabold text-xs">Förare</span>
             </div>
 
-            <!-- Speed Overview Button in Header -->
-            <button onclick="openSpeedOverviewModal()" class="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-extrabold flex items-center gap-1 shadow-lg">
-                <i data-lucide="gauge" class="w-4 h-4"></i> <span id="btn-hdr-speed" class="hidden sm:inline">Hastighet</span>
+            <!-- Dedicated Speedometer Button in Header -->
+            <button onclick="openSpeedOverviewModal()" class="px-3.5 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-lg shadow-cyan-500/10 transition cursor-pointer">
+                <i data-lucide="gauge" class="w-4 h-4 text-cyan-400 animate-pulse"></i> 
+                <span class="font-black text-white">Speedometer</span>
             </button>
 
-            <button onclick="openPersonalSOSModal()" class="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-xl text-white font-black text-xs flex items-center gap-1 shadow-lg shadow-red-600/40 animate-pulse">
-                <i data-lucide="alert-triangle" class="w-4 h-4"></i> SOS
+            <!-- Larma Button (Restored to Original Emergency Style) -->
+            <button onclick="openIncidentModal()" class="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 rounded-xl text-white font-black text-xs flex items-center gap-1 shadow-lg shadow-rose-600/40 animate-pulse cursor-pointer">
+                <i data-lucide="siren" class="w-4 h-4"></i> 
+                <span id="btn-hdr-larma">Larma</span>
             </button>
+
             <button onclick="toggleRightChat()" class="p-2 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 border border-orange-500/40 relative">
                 <i data-lucide="message-square" class="w-4 h-4"></i>
                 <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-orange-500 rounded-full animate-ping"></span>
             </button>
-            <button onclick="openUserConfigModal()" class="p-2 rounded-xl bg-white/10 text-white hover:bg-white/20">
+
+            <!-- Profile & Settings Button -->
+            <button onclick="openUserConfigModal()" title="Profil & Inställningar" class="p-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition cursor-pointer">
                 <i data-lucide="user-cog" class="w-4 h-4"></i>
             </button>
         </div>
     </header>
 
+    <!-- USER PROFILE & SETTINGS MODAL -->
+    <div id="user-config-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-6 border border-white/20 shadow-2xl relative bg-slate-950 text-center space-y-5 max-h-[90vh] overflow-y-auto">
+            <!-- Close Button -->
+            <button onclick="closeUserConfigModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-white/10 p-2 rounded-full transition cursor-pointer">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+
+            <!-- Header -->
+            <div class="flex items-center gap-3 border-b border-white/10 pb-4 text-left">
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-2xl font-black text-white shadow-lg shadow-orange-500/20">
+                    👤
+                </div>
+                <div>
+                    <h2 id="profile-modal-title" class="text-xl font-black text-white">Förarprofil & Inställningar</h2>
+                    <p id="profile-modal-sub" class="text-xs text-orange-400 font-bold">Konto, Tema & Sekretess</p>
+                </div>
+            </div>
+
+            <!-- Profile Details Form -->
+            <div class="space-y-4 text-left">
+                <div class="space-y-1">
+                    <label id="lbl-setting-username" class="block text-[11px] font-bold text-gray-400 uppercase">Förarnamn / Rider Tag</label>
+                    <input type="text" id="profile-input-name" placeholder="Förare" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1">
+                        <label id="lbl-setting-vehicle" class="block text-[11px] font-bold text-gray-400 uppercase">Fordonstyp</label>
+                        <select id="profile-input-vehicle" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500">
+                            <option value="car">🚗 Bil</option>
+                            <option value="helmet">🏍️ MC / Moppe / Quad</option>
+                        </select>
+                    </div>
+
+                    <div class="space-y-1">
+                        <label id="lbl-setting-city" class="block text-[11px] font-bold text-gray-400 uppercase">Region / Stad</label>
+                        <select id="profile-input-city" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500">
+                            <option value="stockholm">📍 Stockholm</option>
+                            <option value="goteborg">📍 Göteborg</option>
+                            <option value="malmo">📍 Malmö</option>
+                            <option value="uppsala">📍 Uppsala</option>
+                            <option value="orebro">📍 Örebro</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- NEW: GHOST MODE PRIVACY TOGGLE -->
+                <div class="p-3.5 bg-slate-900/90 rounded-2xl border border-purple-500/30 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-xl text-purple-400">
+                            👻
+                        </div>
+                        <div>
+                            <h4 id="lbl-setting-ghost-title" class="text-xs font-black text-white">Spökläge (Ghost Mode)</h4>
+                            <p id="lbl-setting-ghost-sub" class="text-[10px] text-gray-400">Dölj din live-position på kartan</p>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="setting-ghost-toggle" onchange="toggleGhostMode(this.checked)" class="sr-only peer">
+                        <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                    </label>
+                </div>
+
+                <!-- NEW: LANGUAGE SELECTOR -->
+                <div class="space-y-1">
+                    <label id="lbl-setting-lang" class="block text-[11px] font-bold text-gray-400 uppercase">Språk / Language</label>
+                    <select id="profile-input-language" onchange="changeAppLanguage(this.value)" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500">
+                        <option value="sv">🇸🇪 Svenska (Swedish)</option>
+                        <option value="en">🇬🇧 English</option>
+                        <option value="de">🇩🇪 Deutsch (German)</option>
+                        <option value="fi">🇫🇮 Suomi (Finnish)</option>
+                    </select>
+                </div>
+
+                <!-- NEW: APP COLOR THEME SELECTOR -->
+                <div class="space-y-2 pt-1 border-t border-white/10">
+                    <label id="lbl-setting-theme" class="block text-[11px] font-bold text-gray-400 uppercase">App Färgtema</label>
+                    <div class="grid grid-cols-5 gap-2">
+                        <button type="button" onclick="setAppColorTheme('orange')" class="app-theme-btn p-2 rounded-xl bg-slate-900 border-2 border-orange-500 flex flex-col items-center gap-1 cursor-pointer">
+                            <span class="w-4 h-4 rounded-full bg-orange-500"></span>
+                            <span class="text-[9px] font-bold text-white">Orange</span>
+                        </button>
+                        <button type="button" onclick="setAppColorTheme('cyan')" class="app-theme-btn p-2 rounded-xl bg-slate-900 border border-white/15 flex flex-col items-center gap-1 cursor-pointer">
+                            <span class="w-4 h-4 rounded-full bg-cyan-400"></span>
+                            <span class="text-[9px] font-bold text-gray-300">Cyan</span>
+                        </button>
+                        <button type="button" onclick="setAppColorTheme('green')" class="app-theme-btn p-2 rounded-xl bg-slate-900 border border-white/15 flex flex-col items-center gap-1 cursor-pointer">
+                            <span class="w-4 h-4 rounded-full bg-emerald-400"></span>
+                            <span class="text-[9px] font-bold text-gray-300">Grön</span>
+                        </button>
+                        <button type="button" onclick="setAppColorTheme('red')" class="app-theme-btn p-2 rounded-xl bg-slate-900 border border-white/15 flex flex-col items-center gap-1 cursor-pointer">
+                            <span class="w-4 h-4 rounded-full bg-rose-500"></span>
+                            <span class="text-[9px] font-bold text-gray-300">Röd</span>
+                        </button>
+                        <button type="button" onclick="setAppColorTheme('purple')" class="app-theme-btn p-2 rounded-xl bg-slate-900 border border-white/15 flex flex-col items-center gap-1 cursor-pointer">
+                            <span class="w-4 h-4 rounded-full bg-purple-500"></span>
+                            <span class="text-[9px] font-bold text-gray-300">Lila</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="pt-2 space-y-2">
+                <button id="btn-save-profile" onclick="saveUserProfile()" class="w-full py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-black text-sm shadow-xl hover:brightness-110 transition cursor-pointer">
+                    SPARA PROFIL & INSTÄLLNINGAR
+                </button>
+                <button id="btn-logout-user" onclick="logoutUser()" class="w-full py-2.5 rounded-2xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-bold transition cursor-pointer">
+                    Logga ut
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- RIDER PROFILE POPUP MODAL (FROM MAP CLICKS) -->
+    <div id="rider-profile-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
+        <div class="glass-panel w-full max-w-sm rounded-3xl p-6 border border-cyan-500/30 shadow-2xl relative bg-slate-950 text-center space-y-5">
+            <button onclick="closeRiderProfileModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-white/10 p-2 rounded-full transition cursor-pointer">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+
+            <!-- Rider Avatar & Info -->
+            <div class="flex flex-col items-center gap-2 pt-2">
+                <div id="target-rider-avatar" class="w-20 h-20 rounded-full border-4 border-cyan-400 bg-slate-900 shadow-[0_0_20px_rgba(0,240,255,0.4)] flex items-center justify-center text-3xl">
+                    🏎️
+                </div>
+                <div>
+                    <h2 id="target-rider-name" class="text-xl font-black text-white">Förare</h2>
+                    <p id="target-rider-type" class="text-xs text-cyan-400 font-extrabold uppercase">Bil • Aktiv på kartan</p>
+                </div>
+            </div>
+
+            <!-- Telemetry Snippet -->
+            <div class="grid grid-cols-2 gap-2 text-left bg-slate-900/80 p-3 rounded-2xl border border-white/10">
+                <div>
+                    <span class="text-[9px] text-gray-400 font-bold block uppercase">Aktuell Fart</span>
+                    <span id="target-rider-speed" class="text-sm font-black text-white">0 km/h</span>
+                </div>
+                <div>
+                    <span class="text-[9px] text-gray-400 font-bold block uppercase">Plats</span>
+                    <span id="target-rider-location" class="text-sm font-black text-white">Stockholm</span>
+                </div>
+            </div>
+
+            <!-- Direct Actions -->
+            <div class="space-y-2 pt-1">
+                <button id="btn-start-rider-chat" onclick="openDirectChatFromRider()" class="w-full py-3 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-black text-xs shadow-lg shadow-cyan-500/20 hover:brightness-110 flex items-center justify-center gap-2 transition cursor-pointer">
+                    <i data-lucide="message-square" class="w-4 h-4"></i>
+                    <span>CHATTA MED FÖRAREN</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SOS / EMERGENCY ALERT MODAL -->
+    <div id="sos-alert-modal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-6 border-2 border-rose-500/60 shadow-[0_0_40px_rgba(244,63,94,0.3)] relative bg-slate-950 text-center space-y-5">
+            <button onclick="closeIncidentModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-white/10 p-2 rounded-full transition cursor-pointer">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+
+            <div class="flex items-center justify-center gap-2 border-b border-rose-500/30 pb-3">
+                <div class="p-2 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse">
+                    <i data-lucide="siren" class="w-7 h-7"></i>
+                </div>
+                <div class="text-left">
+                    <h2 class="text-lg font-black text-rose-400 uppercase tracking-wide">AKUT NÖDLARM</h2>
+                    <p class="text-xs text-gray-300">Varna alla förare och skicka din position i realtid</p>
+                </div>
+            </div>
+
+            <div class="space-y-3 text-left">
+                <label class="block text-[11px] font-bold text-gray-300 uppercase">Välj Typ av Nödlarm</label>
+                <div class="grid grid-cols-4 gap-2">
+                    <button type="button" onclick="selectSosType(this, 'Olycka')" class="sos-type-btn p-2.5 rounded-2xl bg-rose-950/60 border-2 border-rose-500 text-white font-extrabold text-[11px] flex flex-col items-center gap-1 cursor-pointer">
+                        <span class="text-xl">⚠️</span>
+                        <span>Olycka</span>
+                    </button>
+                    <button type="button" onclick="selectSosType(this, 'Poliskontroll')" class="sos-type-btn p-2.5 rounded-2xl bg-slate-900 border border-white/15 text-gray-300 font-bold text-[11px] flex flex-col items-center gap-1 cursor-pointer">
+                        <span class="text-xl">🚔</span>
+                        <span>Polis</span>
+                    </button>
+                    <button type="button" onclick="selectSosType(this, 'Väghinder')" class="sos-type-btn p-2.5 rounded-2xl bg-slate-900 border border-white/15 text-gray-300 font-bold text-[11px] flex flex-col items-center gap-1 cursor-pointer">
+                        <span class="text-xl">🚧</span>
+                        <span>Hinder</span>
+                    </button>
+                    <button type="button" onclick="selectSosType(this, 'Fartkamera')" class="sos-type-btn p-2.5 rounded-2xl bg-slate-900 border border-white/15 text-gray-300 font-bold text-[11px] flex flex-col items-center gap-1 cursor-pointer">
+                        <span class="text-xl">📷</span>
+                        <span>Kamera</span>
+                    </button>
+                </div>
+
+                <!-- GPS Location Live Status Badge -->
+                <div class="p-3 bg-slate-900/90 rounded-2xl border border-cyan-500/30 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-3 h-3 rounded-full bg-cyan-400 animate-ping"></span>
+                        <div>
+                            <span class="text-[10px] font-black uppercase text-cyan-400 block tracking-wider">LIVE GPS POSITION</span>
+                            <span id="sos-live-coords" class="text-xs font-bold text-white">Stockholm (59.3293, 18.0686)</span>
+                        </div>
+                    </div>
+                    <span class="text-[9px] font-bold text-gray-400 bg-white/10 px-2 py-1 rounded-lg">Kopplad 📍</span>
+                </div>
+
+                <div class="space-y-1 pt-1">
+                    <label class="block text-[11px] font-bold text-gray-300 uppercase">Ytterligare info (Valfritt)</label>
+                    <input type="text" id="sos-input-desc" placeholder="t.ex. Höger fil blockerad (position skickas automatiskt)" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500">
+                </div>
+            </div>
+
+            <button onclick="sendEmergencyBroadcast()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 text-white font-black text-sm shadow-xl shadow-rose-600/40 hover:brightness-110 flex items-center justify-center gap-2 transition cursor-pointer">
+                <i data-lucide="radio" class="w-5 h-5 animate-ping"></i>
+                <span>SKICKA LARM MED MIN POSITION 🚨</span>
+            </button>
+        </div>
+    </div>
+
     <!-- RIGHT SIDE DIRECT MESSAGES DRAWER -->
     <aside id="right-chat-panel" class="closed fixed top-16 right-0 bottom-16 z-40 w-full sm:w-80 md:w-96 glass-panel border-l border-white/15 bg-slate-950/95 flex flex-col shadow-2xl">
-        <!-- Drawer Header -->
         <div class="p-3.5 border-b border-white/10 flex items-center justify-between bg-slate-900/90">
             <div class="flex items-center gap-2">
                 <i data-lucide="message-square-text" class="w-5 h-5 text-orange-400"></i>
                 <div>
-                    <h3 id="dm-title" class="font-black text-white text-xs">Direktmeddelanden</h3>
-                    <p id="dm-sub" class="text-[10px] text-gray-400">Chatta med förare i närheten</p>
+                    <h2 id="top-title" class="font-black text-sm text-white">RideOut Feed</h2>
+                    <p id="top-sub" class="text-[10px] text-gray-400">Gemenskap & Aktiviteter</p>
                 </div>
             </div>
-            <button onclick="toggleRightChat()" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10">
-                <i data-lucide="x" class="w-5 h-5"></i>
-            </button>
-        </div>
 
-        <!-- Chat Conversations List View -->
-        <div id="side-chat-list-view" class="flex-1 overflow-y-auto p-3 space-y-3">
-            <div>
-                <h4 class="text-[10px] font-black text-orange-400 uppercase tracking-wider mb-2">🔥 RideOut Grupper</h4>
-                <div onclick="openSideChatConversation('group_e1', 'Stockholm Night Cruise 🌙', 'Gruppchatt • 14 deltagare', 'from-orange-500 to-amber-500')" class="glass-button p-3 rounded-2xl flex items-center justify-between cursor-pointer hover:border-orange-500/50">
+            <div class="flex items-center gap-2">
+                <!-- Ghost Mode Badge Indicator (Shown when active) -->
+                <div id="hdr-ghost-badge" class="hidden items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-900/60 border border-purple-500/50 text-[11px] font-extrabold text-purple-300 animate-pulse">
+                    <span>👻</span> <span class="hidden md:inline">Spökläge Aktivt</span>
+                </div>
+
+                <!-- Top Right Driver Indicator -->
+                <div id="header-driver-tag" class="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-900 border border-white/15 text-xs font-bold text-gray-300">
                     <div class="flex items-center gap-2.5">
                         <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-white font-bold text-xs">🔥</div>
                         <div>
@@ -270,12 +581,10 @@
             <div>
                 <h4 class="text-[10px] font-black text-cyan-400 uppercase tracking-wider mb-2">💬 Aktiva Riders</h4>
                 <div id="side-direct-chats-list" class="space-y-2">
-                    <!-- Dynamic DM items injected here -->
                 </div>
             </div>
         </div>
 
-        <!-- Active Conversation View (In Side Panel) -->
         <div id="side-chat-convo-view" class="hidden flex-1 flex flex-col bg-slate-950">
             <div class="p-3 border-b border-white/10 flex items-center justify-between bg-slate-900/90">
                 <div class="flex items-center gap-2.5">
@@ -291,7 +600,6 @@
             </div>
 
             <div id="side-messages-container" class="flex-1 overflow-y-auto p-3 space-y-2.5 text-xs">
-                <!-- Messages rendered here -->
             </div>
 
             <div class="p-2.5 border-t border-white/10 bg-slate-900/90 flex items-center gap-2">
@@ -308,7 +616,6 @@
 
         <!-- TAB 1: FEED / HOME SCREEN (MAIN) -->
         <div id="screen-feed" class="app-screen active p-4 space-y-4 max-w-6xl mx-auto">
-            <!-- Welcome Banner -->
             <div class="glass-panel rounded-3xl p-5 border border-white/15 relative overflow-hidden bg-gradient-to-r from-slate-900 via-black to-slate-900">
                 <div class="flex justify-between items-start">
                     <div>
@@ -322,7 +629,7 @@
                         <span class="text-2xl">🔥</span>
                         <div class="text-left">
                             <span class="text-xs font-black block text-white">RideOuts</span>
-                            <span class="text-[10px] text-gray-400">3 Planerade träffar</span>
+                            <span id="banner-events-count" class="text-[10px] text-gray-400">3 Planerade träffar</span>
                         </div>
                     </button>
                     <button onclick="switchTab('map')" class="p-3 bg-cyan-500/10 hover:bg-cyan-500/20 rounded-2xl border border-cyan-500/30 flex items-center gap-3">
@@ -335,9 +642,7 @@
                 </div>
             </div>
 
-            <!-- Main Layout Grid: Posts on Left, Direct Messages on Right -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                <!-- Left Column: Senaste Händelser Feed -->
                 <div class="lg:col-span-2 space-y-3">
                     <div class="flex items-center justify-between">
                         <h3 id="txt-recent-events" class="text-sm font-black uppercase tracking-wider text-gray-400">Senaste Händelser</h3>
@@ -346,13 +651,10 @@
                         </button>
                     </div>
 
-                    <!-- Feed Posts Cards -->
                     <div id="feed-posts-container" class="space-y-3">
-                        <!-- Posts dynamically rendered -->
                     </div>
                 </div>
 
-                <!-- Right Column: Direct Messages Panel Next to Feed -->
                 <div class="lg:col-span-1 space-y-3">
                     <div class="flex items-center justify-between">
                         <h3 id="txt-messages-header" class="text-sm font-black uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
@@ -361,7 +663,6 @@
                         <span id="txt-direct-groups-badge" class="text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full font-bold border border-orange-500/30">Direkt & Grupper</span>
                     </div>
 
-                    <!-- Embedded In-Feed Direct Messages Box -->
                     <div class="glass-panel p-3.5 rounded-3xl border border-white/15 bg-slate-900/90 space-y-3">
                         <div>
                             <h4 class="text-[10px] font-black text-orange-400 uppercase tracking-wider mb-2">🔥 RideOut Gruppchatt</h4>
@@ -380,7 +681,6 @@
                         <div>
                             <h4 class="text-[10px] font-black text-cyan-400 uppercase tracking-wider mb-2">💬 Direkta Meddelanden</h4>
                             <div id="feed-inline-chats-list" class="space-y-2">
-                                <!-- Dynamic DM list rendered here -->
                             </div>
                         </div>
                     </div>
@@ -395,13 +695,12 @@
                     <h2 id="txt-upcoming-meets" class="text-lg font-black text-white">Kommande RideOuts</h2>
                     <p id="txt-upcoming-meets-sub" class="text-xs text-gray-400">Hitta cruisingar för bilar, MC, mopeder och fyrhjulningar.</p>
                 </div>
-                <button onclick="openCreateEventModal()" class="px-3.5 py-2 bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl text-white font-extrabold text-xs shadow-lg flex items-center gap-1.5">
-                    <i data-lucide="plus" class="w-4 h-4"></i> <span id="btn-create-event">Skapa</span>
+                <button onclick="openCreateEventModal()" class="px-3.5 py-2 bg-gradient-to-r from-orange-500 to-amber-500 rounded-xl text-white font-extrabold text-xs shadow-lg flex items-center gap-1.5 hover:brightness-110 transition cursor-pointer">
+                    <i data-lucide="plus" class="w-4 h-4"></i> <span id="btn-create-event">Skapa Träff</span>
                 </button>
             </div>
 
             <div id="events-list-container" class="space-y-3">
-                <!-- Events rendered here -->
             </div>
         </div>
 
@@ -409,9 +708,7 @@
         <div id="screen-map" class="app-screen p-0 relative">
             <div id="map"></div>
 
-            <!-- MAP OVERLAY CONTROLS -->
             <div class="absolute top-4 left-4 right-4 z-10 flex items-center justify-between pointer-events-none">
-                <!-- Vehicle Filters -->
                 <div class="glass-panel p-1.5 rounded-2xl flex items-center gap-1 pointer-events-auto shadow-2xl">
                     <button onclick="setFilter('all')" id="filter-all" class="px-3 py-1 rounded-xl text-xs font-bold transition-all bg-white/20 text-white">Alla</button>
                     <button onclick="setFilter('car')" id="filter-car" class="px-3 py-1 rounded-xl text-xs font-bold transition-all text-gray-300 hover:text-white">🚗 Bilar</button>
@@ -419,1086 +716,998 @@
                 </div>
 
                 <div class="flex items-center gap-2 pointer-events-auto">
-                    <!-- Quick Incident Alert Button directly on Map -->
-                    <button onclick="openIncidentModal()" class="px-3 py-2 bg-rose-600 hover:bg-rose-500 rounded-2xl text-white font-black text-xs flex items-center gap-1.5 shadow-xl shadow-rose-600/30">
-                        <i data-lucide="siren" class="w-4 h-4"></i> <span id="btn-map-larma">Larma</span>
-                    </button>
                     <button onclick="recenterMap()" class="glass-button w-10 h-10 rounded-2xl flex items-center justify-center text-white">
                         <i data-lucide="crosshair" class="w-5 h-5"></i>
                     </button>
                 </div>
             </div>
-
-            <!-- GPS SPEEDOMETER OVERLAY ON MAP -->
-            <div onclick="openSpeedOverviewModal()" class="absolute bottom-4 left-4 z-10 glass-panel p-3 rounded-2xl border border-white/20 shadow-2xl flex items-center gap-3 bg-slate-950/90 pointer-events-auto cursor-pointer hover:border-cyan-400/50 transition-all">
-                <div class="relative w-12 h-12 flex items-center justify-center rounded-full bg-slate-900 border-2 border-cyan-400 shadow-[0_0_15px_rgba(0,240,255,0.3)]">
-                    <span id="gps-speed-val" class="font-black text-xl text-cyan-400">0</span>
-                </div>
-                <div>
-                    <span id="lbl-gps-speed" class="text-[9px] font-black uppercase text-gray-400 tracking-widest block">GPS Fart</span>
-                    <span class="text-xs font-black text-white flex items-center gap-1">KM/H <i data-lucide="bar-chart-2" class="w-3 h-3 text-cyan-400"></i></span>
-                </div>
-            </div>
         </div>
 
     </main>
-    <!-- HASTIGHETSÖVERSIKT MODAL (SPEED ANALYTICS OVERVIEW) -->
-    <div id="speed-overview-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
-        <div class="glass-panel w-full max-w-md rounded-3xl p-6 border border-cyan-500/40 shadow-2xl relative bg-slate-950 space-y-4">
-            <button onclick="closeSpeedOverviewModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-white/5 p-1.5 rounded-full">
-                <i data-lucide="x" class="w-4 h-4"></i>
+
+    <!-- HASTIGHETSÖVERSIKT / DEDICATED FULL SPEEDOMETER MODAL -->
+    <div id="speed-overview-modal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
+        <div id="speedo-modal-container" class="glass-panel w-full max-w-md rounded-3xl p-6 border-2 border-cyan-400/50 shadow-[0_0_40px_rgba(0,240,255,0.2)] relative bg-slate-950 text-center space-y-5 speedo-theme-cyan">
+            <!-- Close Button -->
+            <button onclick="closeSpeedOverviewModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-white/10 p-2 rounded-full transition cursor-pointer">
+                <i data-lucide="x" class="w-5 h-5"></i>
             </button>
 
-            <div class="flex items-center gap-2.5 border-b border-white/10 pb-3">
-                <div class="p-2 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                    <i data-lucide="gauge" class="w-6 h-6"></i>
+            <!-- Header -->
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                <div class="flex items-center gap-2">
+                    <div id="speedo-hdr-icon" class="p-2 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-[0_0_15px_rgba(0,240,255,0.3)]">
+                        <i data-lucide="gauge" class="w-6 h-6"></i>
+                    </div>
+                    <div class="text-left">
+                        <h2 class="text-xl font-black text-white tracking-wide">SPEEDOMETER</h2>
+                        <p id="speedo-status-sub" class="text-[10px] text-gray-400 font-extrabold uppercase tracking-widest">PAUSAD</p>
+                    </div>
                 </div>
-                <div>
-                    <h2 class="text-lg font-black text-white">Hastighetsöversikt & Statstik</h2>
-                    <p class="text-xs text-gray-400">Realtidsdata för ditt fordon under körningen</p>
+
+                <!-- Theme Color Palette Selector -->
+                <div class="flex items-center gap-1.5 p-1 bg-slate-900/90 rounded-xl border border-white/15">
+                    <button onclick="setSpeedometerTheme('cyan')" title="Cyan" class="w-5 h-5 rounded-full bg-cyan-400 hover:scale-110 transition border border-white/30"></button>
+                    <button onclick="setSpeedometerTheme('red')" title="Sport Röd" class="w-5 h-5 rounded-full bg-rose-500 hover:scale-110 transition border border-white/30"></button>
+                    <button onclick="setSpeedometerTheme('green')" title="Lime Grön" class="w-5 h-5 rounded-full bg-emerald-400 hover:scale-110 transition border border-white/30"></button>
+                    <button onclick="setSpeedometerTheme('amber')" title="Bärnsten Orange" class="w-5 h-5 rounded-full bg-amber-400 hover:scale-110 transition border border-white/30"></button>
+                    <button onclick="setSpeedometerTheme('purple')" title="Lila" class="w-5 h-5 rounded-full bg-purple-500 hover:scale-110 transition border border-white/30"></button>
+                    <button onclick="setSpeedometerTheme('white')" title="Is Vit" class="w-5 h-5 rounded-full bg-slate-200 hover:scale-110 transition border border-white/30"></button>
                 </div>
             </div>
 
-            <!-- Speed KPI Grid -->
-            <div class="grid grid-cols-3 gap-2.5">
-                <div class="bg-slate-900 p-3 rounded-2xl border border-white/10 text-center">
-                    <span class="text-[10px] uppercase font-bold text-gray-400 block">Nuvarande</span>
-                    <span id="stat-current-speed" class="text-2xl font-black text-cyan-400">0</span>
-                    <span class="text-[9px] font-bold text-gray-400 block">km/h</span>
-                </div>
-                <div class="bg-slate-900 p-3 rounded-2xl border border-white/10 text-center">
-                    <span class="text-[10px] uppercase font-bold text-gray-400 block">Toppfart</span>
-                    <span id="stat-max-speed" class="text-2xl font-black text-amber-400">74</span>
-                    <span class="text-[9px] font-bold text-gray-400 block">km/h</span>
-                </div>
-                <div class="bg-slate-900 p-3 rounded-2xl border border-white/10 text-center">
-                    <span class="text-[10px] uppercase font-bold text-gray-400 block">Snittfart</span>
-                    <span id="stat-avg-speed" class="text-2xl font-black text-emerald-400">42</span>
-                    <span class="text-[9px] font-bold text-gray-400 block">km/h</span>
+            <!-- Start / Stop Control Switch -->
+            <div class="flex items-center justify-between gap-2 bg-slate-900/80 p-2 rounded-2xl border border-white/10">
+                <span class="text-xs font-bold text-gray-300 pl-2">Mätarstatus:</span>
+                <button id="btn-toggle-speedo" onclick="toggleSpeedometer()" class="px-5 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-black flex items-center gap-2 transition cursor-pointer">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span>Starta Speedometer</span>
+                </button>
+            </div>
+
+            <!-- ANALOG & DIGITAL REALISTIC AUTOMOTIVE CAR GAUGE CLUSTER -->
+            <div onclick="cycleSpeedometerTheme()" title="Klicka för att byta instrumentbelysning!" class="relative w-80 h-80 mx-auto flex items-center justify-center my-1 select-none cursor-pointer group">
+                <!-- Outer Metallic Car Dashboard Bezel Trim surrounding the entire gauge cluster -->
+                <div id="speedo-bezel-ring" class="absolute inset-1.5 rounded-full border-4 border-[var(--speedo-color)] bg-gradient-to-b from-slate-900 via-slate-950 to-black shadow-[0_0_50px_var(--speedo-glow)] transition-all duration-300 group-hover:scale-[1.01]"></div>
+                
+                <!-- Inner Speedometer Dial Face -->
+                <div class="absolute inset-3 rounded-full bg-slate-950 flex items-center justify-center speedo-dial-glow border border-white/10 overflow-hidden">
+                    
+                    <!-- Color Ambient Radial Glow Zone -->
+                    <div id="speedo-glow-bg" class="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,var(--speedo-glow)_0%,transparent_75%)] pointer-events-none opacity-40"></div>
+
+                    <!-- SVG CURVED GAUGE ARC TRACK & SCALE TICKS (Framed cleanly inside outer ring with radius 132) -->
+                    <svg class="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 300 300">
+                        <!-- Gauge Outer Arc Track (Dark Background) stretched cleanly inside bezel boundary -->
+                        <path d="M 43,224 A 132,132 0 1,1 257,224" fill="none" stroke="rgba(255, 255, 255, 0.15)" stroke-width="10" stroke-linecap="round" />
+                        
+                        <!-- Dynamic Active Gauge Progress Arc running directly around the inner perimeter -->
+                        <path id="speedo-gauge-arc" d="M 43,224 A 132,132 0 1,1 257,224" fill="none" stroke="var(--speedo-color)" stroke-width="10" stroke-linecap="round" stroke-dasharray="656" stroke-dashoffset="656" class="transition-all duration-300 drop-shadow-[0_0_15px_var(--speedo-color)]" />
+
+                        <g id="speedo-ticks-container">
+                            <!-- Dynamiskt genererade mätarstreck laddas via JS -->
+                        </g>
+
+                        <!-- Dynamiska sifferetiketter placerade exakt längs gaugebågen -->
+                        <g id="speedo-labels-container">
+                            <!-- Genereras av JS för perfekt cirkulär linjering -->
+                        </g>
+                    </svg>
+
+                    <!-- Digital Live Speed Display Moved to Bottom of Circle -->
+                    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center justify-center pointer-events-none">
+                        <div class="flex items-baseline justify-center gap-1">
+                            <span id="modal-big-speed" class="text-5xl font-black text-white tracking-tighter drop-shadow-[0_0_20px_var(--speedo-glow)]">0</span>
+                        </div>
+                        <span class="text-[10px] font-black text-[var(--speedo-color)] tracking-widest uppercase -mt-1">KM/H</span>
+                    </div>
+
+                    <!-- Gauge Center Pivot Cap -->
+                    <div class="absolute w-10 h-10 rounded-full bg-slate-900 border-2 border-[var(--speedo-color)] shadow-[0_0_15px_var(--speedo-glow)] z-30 flex items-center justify-center pointer-events-none">
+                        <div class="w-4 h-4 rounded-full bg-[var(--speedo-color)]"></div>
+                    </div>
+
+                    <!-- Physical Centered Gauge Needle -->
+                    <div id="speedo-needle" class="absolute inset-0 z-30 pointer-events-none transition-transform duration-300 cubic-bezier(0.1, 0.9, 0.2, 1)" style="transform: rotate(-125deg);">
+                        <div class="absolute top-[16%] left-1/2 -translate-x-1/2 w-1.5 h-[34%] bg-gradient-to-t from-[var(--speedo-color)] via-white to-rose-500 rounded-full shadow-[0_0_12px_var(--speedo-color)]"></div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Driving Metrics -->
-            <div class="p-3.5 bg-slate-900/90 border border-white/10 rounded-2xl flex items-center justify-between text-xs">
-                <div class="flex items-center gap-2">
-                    <i data-lucide="navigation" class="w-4 h-4 text-orange-400"></i>
-                    <div>
-                        <span class="text-gray-400 block text-[10px]">Körd Sträcka</span>
-                        <span class="font-extrabold text-white text-xs">18.4 km</span>
-                    </div>
+            <!-- Dashboard Telemetry Stats Grid -->
+            <div class="grid grid-cols-4 gap-2 pt-1 text-left">
+                <div class="glass-panel p-2.5 rounded-2xl border border-white/10 bg-slate-900/80">
+                    <span class="text-[9px] font-extrabold text-gray-400 block uppercase">Toppfart</span>
+                    <span id="stat-max-speed" class="text-sm font-black text-rose-400">0 km/h</span>
                 </div>
-                <div class="w-px h-8 bg-white/10"></div>
-                <div class="flex items-center gap-2">
-                    <i data-lucide="clock" class="w-4 h-4 text-purple-400"></i>
-                    <div>
-                        <span class="text-gray-400 block text-[10px]">Körtid</span>
-                        <span class="font-extrabold text-white text-xs">28 min</span>
-                    </div>
+                <div class="glass-panel p-2.5 rounded-2xl border border-white/10 bg-slate-900/80">
+                    <span class="text-[9px] font-extrabold text-gray-400 block uppercase">Snittfart</span>
+                    <span id="stat-avg-speed" class="text-sm font-black text-amber-400">0 km/h</span>
+                </div>
+                <div class="glass-panel p-2.5 rounded-2xl border border-white/10 bg-slate-900/80">
+                    <span class="text-[9px] font-extrabold text-gray-400 block uppercase">Sträcka</span>
+                    <span id="stat-dist" class="text-sm font-black text-cyan-400">0.0 km</span>
+                </div>
+                <div class="glass-panel p-2.5 rounded-2xl border border-white/10 bg-slate-900/80">
+                    <span class="text-[9px] font-extrabold text-gray-400 block uppercase">Mätartid</span>
+                    <span id="stat-time" class="text-sm font-black text-emerald-400">0 s</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- BOTTOM TAB NAVIGATION BAR -->
-    <nav class="fixed bottom-0 left-0 right-0 z-40 h-16 glass-panel border-t border-white/10 flex items-center justify-around px-2">
-        <button onclick="switchTab('feed')" id="nav-feed" class="flex flex-col items-center justify-center w-16 h-12 rounded-xl text-orange-400">
+    <!-- BOTTOM NAVIGATION BAR -->
+    <nav class="fixed bottom-0 left-0 right-0 z-30 h-16 glass-panel border-t border-white/10 px-4 flex items-center justify-around">
+        <button onclick="switchTab('feed')" id="nav-btn-feed" class="flex flex-col items-center gap-1 text-orange-400 transition cursor-pointer">
             <i data-lucide="newspaper" class="w-5 h-5"></i>
-            <span id="lbl-nav-feed" class="text-[10px] font-bold mt-1">Flöde</span>
+            <span class="text-[10px] font-extrabold">Flöde</span>
         </button>
-
-        <button onclick="switchTab('events')" id="nav-events" class="flex flex-col items-center justify-center w-16 h-12 rounded-xl text-gray-400 hover:text-white">
+        <button onclick="switchTab('events')" id="nav-btn-events" class="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition cursor-pointer">
             <i data-lucide="flame" class="w-5 h-5"></i>
-            <span id="lbl-nav-events" class="text-[10px] font-bold mt-1">Meets</span>
+            <span class="text-[10px] font-extrabold">Meets</span>
         </button>
-
-        <button onclick="toggleRightChat()" id="nav-side-chat" class="flex flex-col items-center justify-center w-16 h-12 rounded-xl text-gray-400 hover:text-white relative">
+        <button onclick="toggleRightChat()" id="nav-btn-chat" class="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition cursor-pointer">
             <i data-lucide="message-square" class="w-5 h-5"></i>
-            <span id="lbl-nav-chat" class="text-[10px] font-bold mt-1">Chat</span>
-            <span class="absolute top-1 right-3 w-2 h-2 rounded-full bg-orange-500 animate-ping"></span>
+            <span class="text-[10px] font-extrabold">Chat</span>
         </button>
-
-        <button onclick="switchTab('map')" id="nav-map" class="flex flex-col items-center justify-center w-16 h-12 rounded-xl text-gray-400 hover:text-white">
+        <button onclick="switchTab('map')" id="nav-btn-map" class="flex flex-col items-center gap-1 text-gray-400 hover:text-white transition cursor-pointer">
             <i data-lucide="map-pin" class="w-5 h-5"></i>
-            <span id="lbl-nav-map" class="text-[10px] font-bold mt-1">Karta</span>
+            <span class="text-[10px] font-extrabold">Karta</span>
         </button>
     </nav>
 
-    <!-- PERSONAL SOS EMERGENCY MODAL -->
-    <div id="sos-modal" class="fixed inset-0 z-50 bg-red-950/90 backdrop-blur-xl flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
-        <div class="glass-panel w-full max-w-sm rounded-3xl p-6 border-2 border-red-500 shadow-2xl relative bg-slate-950 text-center">
-            <button onclick="closeSOSModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-white/5 p-1.5 rounded-full">
-                <i data-lucide="x" class="w-4 h-4"></i>
-            </button>
-            <div class="w-16 h-16 rounded-full bg-red-600/30 border-2 border-red-500 flex items-center justify-center mx-auto mb-3 animate-pulse">
-                <i data-lucide="alert-triangle" class="w-9 h-9 text-red-500"></i>
-            </div>
-            <h2 class="text-2xl font-black text-white">EGET NÖDLARM (SOS)</h2>
-            <p class="text-xs text-red-300 mt-1 font-semibold">Har du krockat eller ramlat med MC/Moppe/Quad?</p>
-            <div class="space-y-3 text-left mt-4">
-                <div>
-                    <label class="block text-[11px] font-bold text-gray-300 uppercase mb-1">Vad har hänt?</label>
-                    <select id="sos-incident-type" class="w-full bg-slate-900 border border-red-500/50 rounded-xl px-3 py-2 text-sm text-white">
-                        <option value="crash">💥 Krockat / Kört av vägen</option>
-                        <option value="fall">🏍️ Ramlat av MC / Moped / Quad</option>
-                        <option value="injury">🚑 Skadad - Behöver Akut Hjälp</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-gray-300 uppercase mb-1">Meddelande</label>
-                    <input type="text" id="sos-message" placeholder="Beskriv plats eller skada..." class="w-full bg-slate-900 border border-red-500/50 rounded-xl px-3 py-2 text-sm text-white">
-                </div>
-                <button onclick="confirmPersonalSOS()" class="w-full py-3.5 rounded-2xl bg-red-600 text-white font-black text-sm shadow-xl hover:bg-red-500 transition">
-                    SKICKA NÖD-SOS NU! 🚨
-                </button>
-            </div>
-        </div>
-    </div>
+    <!-- Lucide Icons Library -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- INCIDENT ALERT MODAL -->
-    <div id="incident-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
-        <div class="glass-panel w-full max-w-sm rounded-3xl p-6 border border-rose-500/30 shadow-2xl relative bg-slate-950">
-            <button onclick="closeIncidentModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-white/5 p-1.5 rounded-full">
-                <i data-lucide="x" class="w-4 h-4"></i>
-            </button>
-            <h2 class="text-xl font-black text-white mb-1">Larma Trafikhändelse</h2>
-            <p class="text-[11px] text-gray-400 mb-4">Rapportera för alla i närheten</p>
-            <div class="space-y-3">
-                <select id="inc-type-select" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
-                    <option value="police">🚓 Poliskontroll / Radar</option>
-                    <option value="accident">💥 Olycka / Krock</option>
-                    <option value="traffic">🚗🚙 Tät Kö / Stopp</option>
-                    <option value="hazard">⚠️ Hinder På Vägen</option>
-                </select>
-                <input type="text" id="input-incident-desc" placeholder="Beskrivning (t.ex. Laser vid Sveavägen)" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
-                <button onclick="submitIncidentAlert()" class="w-full py-3 rounded-xl bg-rose-600 text-white font-black text-sm hover:bg-rose-500">PUBLICERA LARM 🚨</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- CREATE EVENT MODAL -->
-    <div id="create-event-modal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
-        <div class="glass-panel w-full max-w-sm rounded-3xl p-6 border border-white/15 shadow-2xl relative bg-slate-950">
-            <button onclick="closeCreateEventModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-white/5 p-1.5 rounded-full">
-                <i data-lucide="x" class="w-4 h-4"></i>
-            </button>
-            <h2 class="text-xl font-black text-white mb-1">Skapa RideOut</h2>
-            <p class="text-xs text-gray-400 mb-4">Starta en samling för bilar eller tvåhjulingar.</p>
-            <div class="space-y-3">
-                <input type="text" id="input-event-title" placeholder="RideOut Namn" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
-                <input type="text" id="input-event-location" placeholder="Mötespunkt (t.ex. Brostugan)" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
-                <input type="text" id="input-event-time" placeholder="Tid (t.ex. 21:00 ikväll)" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
-                <select id="input-event-vehicle" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
-                    <option value="all">Alla Fordon</option>
-                    <option value="car">Endast Bilar 🚗</option>
-                    <option value="helmet">Endast MC/Moppe/Quad 🏍️</option>
-                </select>
-                <button onclick="createNewEvent()" class="w-full py-3 rounded-xl bg-orange-500 text-white font-black text-sm hover:bg-orange-600">PUBLICERA 🔥</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- USER CONFIG MODAL -->
-    <div id="user-config-modal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
-        <div class="glass-panel w-full max-w-sm rounded-3xl p-6 border border-white/15 shadow-2xl relative bg-slate-950">
-            <button onclick="closeUserConfigModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white bg-white/5 p-1.5 rounded-full">
-                <i data-lucide="x" class="w-4 h-4"></i>
-            </button>
-            <h2 class="text-xl font-black text-white mb-1">Min Profil & Fordon</h2>
-            <div class="space-y-3 mt-4">
-
-                <!-- PROFILE PICTURE UPLOADER -->
-                <div class="flex items-center gap-3 p-3 bg-slate-900/90 border border-white/10 rounded-2xl">
-                    <div class="relative group">
-                        <div id="profile-avatar-preview" class="w-14 h-14 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-black text-lg border-2 border-cyan-400 overflow-hidden shadow-lg">
-                            <span id="profile-avatar-letter">N</span>
-                            <img id="profile-avatar-img" class="w-full h-full object-cover hidden" alt="Avatar">
-                        </div>
-                    </div>
-                    <div class="flex-1 space-y-1">
-                        <label class="block text-[11px] font-bold text-gray-300 uppercase">Profilbild</label>
-                        <div class="flex gap-2">
-                            <label class="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-bold cursor-pointer transition">
-                                📷 Välj bild
-                                <input type="file" id="input-profile-avatar" accept="image/*" onchange="handleAvatarUpload(event)" class="hidden">
-                            </label>
-                            <button type="button" onclick="resetAvatarImage()" class="px-2 py-1.5 bg-white/10 hover:bg-white/20 text-gray-400 hover:text-white rounded-xl text-xs font-bold transition">
-                                ❌ Ta bort
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-[11px] font-bold text-gray-300 uppercase mb-1">Förarnamn</label>
-                    <input type="text" id="input-user-name" value="Användare" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-gray-300 uppercase mb-1">Statusmeddelande</label>
-                    <input type="text" id="input-user-status" value="Redo för RideOut 🔥" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-gray-300 uppercase mb-1">Fordonstyp</label>
-                    <select id="input-user-vehicle" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white">
-                        <option value="car">🚗 Bil (Visar Bil-ikon)</option>
-                        <option value="helmet">🏍️ MC / Moppe / Quad (Visar Hjälm)</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-gray-300 uppercase mb-1">Språk / Language</label>
-                    <select id="input-user-lang" onchange="changeAppLanguage(this.value)" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white font-bold">
-                        <option value="sv">🇸🇪 Svenska</option>
-                        <option value="en">🇬🇧 English</option>
-                        <option value="no">🇳🇴 Norsk</option>
-                        <option value="fi">🇫🇮 Suomi</option>
-                        <option value="de">🇩🇪 Deutsch</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-gray-300 uppercase mb-1">Din Stad / Område</label>
-                    <select id="input-user-city" onchange="changeUserCity(this.value)" class="w-full bg-slate-900 border border-white/15 rounded-xl px-3 py-2 text-sm text-white font-bold">
-                        <option value="stockholm">📍 Stockholm (Innerstad & Förorter)</option>
-                        <option value="goteborg">📍 Göteborg & Omnejd</option>
-                        <option value="malmo">📍 Malmö / Skåne</option>
-                        <option value="uppsala">📍 Uppsala</option>
-                        <option value="orebro">📍 Örebro</option>
-                    </select>
-                </div>
-                
-                <!-- Speed Visibility Setting -->
-                <div class="p-3 bg-slate-900/90 border border-white/10 rounded-xl space-y-2">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <i data-lucide="eye" class="w-4 h-4 text-cyan-400"></i>
-                            <span class="text-xs font-bold text-white">Visa Hastighet på Karta</span>
-                        </div>
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="input-user-speed-public" checked class="sr-only peer">
-                            <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
-                        </label>
-                    </div>
-                    <p id="speed-privacy-hint" class="text-[10px] text-gray-400">Offentlig: Andra förare ser din hastighet (km/h) i realtid.</p>
-                </div>
-
-                <!-- GPS Location Access Mode Setting -->
-                <div class="p-3 bg-slate-900/90 border border-white/10 rounded-xl space-y-2">
-                    <div class="flex items-center gap-2">
-                        <i data-lucide="navigation" class="w-4 h-4 text-emerald-400"></i>
-                        <span class="text-xs font-bold text-white">Platsbehörighet (GPS)</span>
-                    </div>
-                    <select id="input-location-mode" class="w-full bg-slate-800 border border-white/15 rounded-xl px-2.5 py-1.5 text-xs text-white">
-                        <option value="always">🟢 Alltid tillåt (Bakgrund & Kartspårning)</option>
-                        <option value="while_using" selected>🟡 Bara när appen används</option>
-                        <option value="never">🔴 Tillåt inte (Privatläge utan GPS)</option>
-                    </select>
-                </div>
-
-                <button onclick="saveUserProfile()" class="w-full py-3 rounded-xl bg-cyan-500 text-white font-black text-sm hover:bg-cyan-600">SPARA</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- TOAST NOTIFICATION -->
-    <div id="toast" class="fixed top-20 left-1/2 -translate-x-1/2 z-50 glass-panel px-4 py-2 rounded-2xl border border-orange-400/40 text-white text-xs font-bold shadow-2xl transition-all duration-300 -translate-y-12 opacity-0 pointer-events-none">
-        <span id="toast-msg">Notis</span>
-    </div>
-
-    <!-- JAVASCRIPT ENGINE -->
+    <!-- MAIN APP SCRIPT -->
     <script>
+        // --- State Management ---
+        let currentAuthMode = 'register';
+        let currentUser = null;
+        let isGhostMode = false;
+        let currentLanguage = 'sv';
+        let currentAppTheme = 'orange';
+        let selectedRiderForChat = null;
+        let selectedSosCategory = 'Olycka';
         let map = null;
-        let currentFilter = 'all';
-        let activeSelectedRiderId = null;
-        let activeChatId = null;
-        let speedWatchId = null;
-        let filterOnlyNearby = false;
+        let currentSpeed = 0;
+        let maxSpeed = 0;
+        let driveSeconds = 0;
+        let totalDistance = 0;
+        let driveTimerInterval = null;
+        let isSpeedoActive = false;
+        let activeTheme = 'cyan';
+        const themes = ['cyan', 'red', 'green', 'amber', 'purple', 'white'];
 
-        let maxSpeedTracked = 74;
-        let avgSpeedTracked = 42;
-
-        // Coordinates for regions
-        const cityCoords = {
-            stockholm: { lat: 59.3293, lng: 18.0686, name: "Stockholm" },
-            goteborg: { lat: 57.7088, lng: 11.9745, name: "Göteborg" },
-            malmo: { lat: 55.6050, lng: 13.0038, name: "Malmö" },
-            uppsala: { lat: 59.8588, lng: 17.6389, name: "Uppsala" },
-            orebro: { lat: 59.2753, lng: 15.2134, name: "Örebro" }
-        };
-
-        // Mock Feed Posts Data
-        const posts = [
-            { id: 'p1', author: 'Marcus_GTR', time: '10 min sedan', type: 'car', content: 'Grymt drag vid Barkarby ikväll! Tack alla som dök upp på spontancruisen 🏎️🔥' },
-            { id: 'p2', author: 'MoppeKungen', time: '25 min sedan', type: 'helmet', content: 'Samling vid Donken i stan kl 20:00! Alla 50cc, 125cc och A2 är välkomna 🏍️💨' },
-            { id: 'p3', author: 'Lisa_Turbo', time: '1 timme sedan', type: 'car', content: 'Någon som är sugen på en nattrunda längs kusten? 🌙 Vädret är perfekt!' }
-        ];
-
-        // Mock Planned Events Data
-        const eventsList = [
-            { id: 'e1', title: 'Stockholm Night Cruise 🌙', location: 'Barkarby Handelsplats', time: 'Idag 21:00', city: 'stockholm', attendees: 14, type: 'all' },
-            { id: 'e2', title: 'Moped & A2 Sommarträff 🏍️', location: 'Skogskyrkogården parkering', time: 'Lördag 15:00', city: 'stockholm', attendees: 28, type: 'helmet' },
-            { id: 'e3', title: 'Göteborg Tuner Meet 🚗', location: 'Avenyn', time: 'Söndag 18:00', city: 'goteborg', attendees: 19, type: 'car' }
-        ];
-
-        // Mock Active Riders Data
-        const riders = [
-            { id: 'r1', name: 'Alex_Rider', type: 'car', vehicleName: 'BMW M3 Competition', status: 'Gör sig redo för Barkarby 🏁', color: 'from-orange-500 to-amber-500', lat: 59.332, lng: 18.065, speed: 52, isSpeedPublic: true, city: 'stockholm' },
-            { id: 'r2', name: 'Moppe_Jonne', type: 'helmet', vehicleName: 'Yamaha Aerox 70cc', status: 'Ute och gliding! 💨', color: 'from-yellow-400 to-amber-500', lat: 59.325, lng: 18.075, speed: 45, isSpeedPublic: true, city: 'stockholm' },
-            { id: 'r3', name: 'Sofia_MC', type: 'helmet', vehicleName: 'Kawasaki Z900', status: 'Kaffestopp vid macken ☕', color: 'from-emerald-400 to-teal-500', lat: 59.335, lng: 18.058, speed: 0, isSpeedPublic: false, city: 'stockholm' }
-        ];
-
-        // Mock Direct Chat Messages
-        const chatMessages = {
-            'group_e1': [
-                { sender: 'Alex_Rider', text: 'Samling vid macken kl 21:00! 🏎️', time: '21:00', isMe: false },
-                { sender: 'Moppe_Jonne', text: 'Vi rullar dit nu från söder!', time: '21:02', isMe: false }
-            ],
-            'r1': [
-                { sender: 'Alex_Rider', text: 'Tjena! Är du på väg till träffen?', time: '20:45', isMe: false }
-            ],
-            'r2': [
-                { sender: 'Moppe_Jonne', text: 'Tjena, hänger du med ut och kör?', time: '20:50', isMe: false }
-            ],
-            'r3': [
-                { sender: 'Sofia_MC', text: 'Vi drar mot bulten imorgon bitti!', time: '19:12', isMe: false }
-            ]
-        };
-
-        let currentUser = {
-            id: 'user_me',
-            name: 'Nico_Speed',
-            type: 'car',
-            city: 'stockholm',
-            lang: 'sv',
-            color: 'from-cyan-500 to-blue-600',
-            status: 'Redo för RideOut! 🔥',
-            speed: 0,
-            avatarImg: null, // Base64 or URL for custom avatar image
-            isSpeedPublic: true,
-            locationPermission: 'while_using',
-            lat: 59.3293,
-            lng: 18.0686
-        };
-
-        function switchTab(tabId) {
-            document.querySelectorAll('.app-screen').forEach(el => el.classList.remove('active'));
-            
-            const targetScreen = document.getElementById(`screen-${tabId}`);
-            if (targetScreen) {
-                targetScreen.classList.add('active');
+        // --- Language Translations Dictionary ---
+        const translations = {
+            sv: {
+                topTitle: "RideOut Flöde",
+                topSub: "Gemenskap & Aktiviteter",
+                profileModalTitle: "Förarprofil & Inställningar",
+                profileModalSub: "Konto, Tema & Sekretess",
+                usernameLabel: "Förarnamn / Rider Tag",
+                vehicleLabel: "Fordonstyp",
+                cityLabel: "Region / Stad",
+                ghostTitle: "Spökläge (Ghost Mode)",
+                ghostSub: "Dölj din live-position på kartan",
+                langLabel: "Språk / Language",
+                themeLabel: "App Färgtema",
+                saveBtn: "SPARA PROFIL & INSTÄLLNINGAR",
+                logoutBtn: "Logga ut",
+                tabFeed: "Flöde",
+                tabMeets: "Meets",
+                tabChat: "Chat",
+                tabMap: "Karta",
+                larmaBtn: "Larma",
+                speedoBtn: "Speedometer",
+                recentEvents: "Senaste Händelser",
+                upcomingMeets: "Kommande RideOuts",
+                upcomingMeetsSub: "Hitta cruisingar för bilar, MC, mopeder och fyrhjulningar.",
+                createEventBtn: "Skapa Träff"
+            },
+            en: {
+                topTitle: "RideOut Feed",
+                topSub: "Community & Events",
+                profileModalTitle: "Driver Profile & Settings",
+                profileModalSub: "Account, Theme & Privacy",
+                usernameLabel: "Driver Name / Rider Tag",
+                vehicleLabel: "Vehicle Type",
+                cityLabel: "Region / City",
+                ghostTitle: "Ghost Mode",
+                ghostSub: "Hide your live position on the map",
+                langLabel: "Language / Språk",
+                themeLabel: "App Color Theme",
+                saveBtn: "SAVE PROFILE & SETTINGS",
+                logoutBtn: "Log out",
+                tabFeed: "Feed",
+                tabMeets: "Meets",
+                tabChat: "Chat",
+                tabMap: "Map",
+                larmaBtn: "Alert",
+                speedoBtn: "Speedometer",
+                recentEvents: "Recent Activity",
+                upcomingMeets: "Upcoming RideOuts",
+                upcomingMeetsSub: "Find cruises for cars, MCs, scooters and quads.",
+                createEventBtn: "Create Meet"
+            },
+            de: {
+                topTitle: "RideOut Feed",
+                topSub: "Community & Aktivitäten",
+                profileModalTitle: "Fahrerprofil & Einstellungen",
+                profileModalSub: "Konto, Theme & Datenschutz",
+                usernameLabel: "Fahrername / Rider Tag",
+                vehicleLabel: "Fahrzeugtyp",
+                cityLabel: "Region / Stadt",
+                ghostTitle: "Geister-Modus (Ghost Mode)",
+                ghostSub: "Live-Position auf der Karte verbergen",
+                langLabel: "Sprache / Language",
+                themeLabel: "App-Farbthema",
+                saveBtn: "PROFIL SPEICHERN",
+                logoutBtn: "Abmelden",
+                tabFeed: "Feed",
+                tabMeets: "Treffen",
+                tabChat: "Chat",
+                tabMap: "Karte",
+                larmaBtn: "Alarm",
+                speedoBtn: "Tacho",
+                recentEvents: "Neueste Ereignisse",
+                upcomingMeets: "Kommende RideOuts",
+                upcomingMeetsSub: "Finde Ausfahrten für Autos, MCs, Mopeds und Quads.",
+                createEventBtn: "Treffen Erstellen"
+            },
+            fi: {
+                topTitle: "RideOut Syöte",
+                topSub: "Yhteisö & Tapahtumat",
+                profileModalTitle: "Kuljettajaprofiili & Asetukset",
+                profileModalSub: "Tili, Teema & Yksityisyys",
+                usernameLabel: "Kuljettajan nimi / Rider Tag",
+                vehicleLabel: "Ajoneuvotyyppi",
+                cityLabel: "Alue / Kaupunki",
+                ghostTitle: "Hamestila (Ghost Mode)",
+                ghostSub: "Piilota sijaintisi kartalta",
+                langLabel: "Kieli / Language",
+                themeLabel: "Sovelluksen väriteema",
+                saveBtn: "TALLENNA ASETUKSET",
+                logoutBtn: "Kirjaudu ulos",
+                tabFeed: "Syöte",
+                tabMeets: "Tapahtumat",
+                tabChat: "Chat",
+                tabMap: "Kartta",
+                larmaBtn: "Hälytys",
+                speedoBtn: "Nopeusmittari",
+                recentEvents: "Viimeisimmät Tapahtumat",
+                upcomingMeets: "Tulevat RideOutit",
+                upcomingMeetsSub: "Etsi ajotapahtumia autoille, moottoripyörille ja mopoille.",
+                createEventBtn: "Luo Tapahtuma"
             }
+        };
 
-            const titles = {
-                feed: { title: 'RideOut Feed', sub: 'Gemenskap & Aktiviteter' },
-                events: { title: 'Kommande Meets', sub: 'Planerade träffar & cruising' },
-                map: { title: 'Live Karta', sub: 'Se förare & larm i realtid' }
+        // --- Settings Functions ---
+        window.toggleGhostMode = function(enabled) {
+            isGhostMode = enabled;
+            const badge = document.getElementById('hdr-ghost-badge');
+            if (badge) {
+                if (enabled) {
+                    badge.classList.remove('hidden');
+                    badge.classList.add('flex');
+                } else {
+                    badge.classList.add('hidden');
+                    badge.classList.remove('flex');
+                }
+            }
+        };
+
+        window.changeAppLanguage = function(langCode) {
+            currentLanguage = langCode;
+            const t = translations[langCode] || translations.sv;
+
+            // Header & Sub
+            const topTitle = document.getElementById('top-title');
+            const topSub = document.getElementById('top-sub');
+            if (topTitle) topTitle.textContent = t.topTitle;
+            if (topSub) topSub.textContent = t.topSub;
+
+            // Settings Modal Labels
+            const profTitle = document.getElementById('profile-modal-title');
+            const profSub = document.getElementById('profile-modal-sub');
+            const lblUser = document.getElementById('lbl-setting-username');
+            const lblVeh = document.getElementById('lbl-setting-vehicle');
+            const lblCity = document.getElementById('lbl-setting-city');
+            const lblGhostTitle = document.getElementById('lbl-setting-ghost-title');
+            const lblGhostSub = document.getElementById('lbl-setting-ghost-sub');
+            const lblLang = document.getElementById('lbl-setting-lang');
+            const lblTheme = document.getElementById('lbl-setting-theme');
+            const btnSave = document.getElementById('btn-save-profile');
+            const btnLogout = document.getElementById('btn-logout-user');
+
+            if (profTitle) profTitle.textContent = t.profileModalTitle;
+            if (profSub) profSub.textContent = t.profileModalSub;
+            if (lblUser) lblUser.textContent = t.usernameLabel;
+            if (lblVeh) lblVeh.textContent = t.vehicleLabel;
+            if (lblCity) lblCity.textContent = t.cityLabel;
+            if (lblGhostTitle) lblGhostTitle.textContent = t.ghostTitle;
+            if (lblGhostSub) lblGhostSub.textContent = t.ghostSub;
+            if (lblLang) lblLang.textContent = t.langLabel;
+            if (lblTheme) lblTheme.textContent = t.themeLabel;
+            if (btnSave) btnSave.textContent = t.saveBtn;
+            if (btnLogout) btnLogout.textContent = t.logoutBtn;
+
+            // Main UI Elements
+            const larmaText = document.getElementById('btn-hdr-larma');
+            const recentEvents = document.getElementById('txt-recent-events');
+            const upcomingMeets = document.getElementById('txt-upcoming-meets');
+            const upcomingMeetsSub = document.getElementById('txt-upcoming-meets-sub');
+            const createEventBtn = document.getElementById('btn-create-event');
+
+            if (larmaText) larmaText.textContent = t.larmaBtn;
+            if (recentEvents) recentEvents.textContent = t.recentEvents;
+            if (upcomingMeets) upcomingMeets.textContent = t.upcomingMeets;
+            if (upcomingMeetsSub) upcomingMeetsSub.textContent = t.upcomingMeetsSub;
+            if (createEventBtn) createEventBtn.textContent = t.createEventBtn;
+
+            // Bottom Navigation Labels
+            const navFeed = document.querySelector('#nav-btn-feed span');
+            const navMeets = document.querySelector('#nav-btn-events span');
+            const navChat = document.querySelector('#nav-btn-chat span');
+            const navMap = document.querySelector('#nav-btn-map span');
+
+            if (navFeed) navFeed.textContent = t.tabFeed;
+            if (navMeets) navMeets.textContent = t.tabMeets;
+            if (navChat) navChat.textContent = t.tabChat;
+            if (navMap) navMap.textContent = t.tabMap;
+        };
+
+        window.setAppColorTheme = function(colorName) {
+            currentAppTheme = colorName;
+            document.querySelectorAll('.app-theme-btn').forEach(btn => {
+                btn.className = "app-theme-btn p-2 rounded-xl bg-slate-900 border border-white/15 flex flex-col items-center gap-1 cursor-pointer";
+            });
+            
+            // Highlight selected theme button in settings
+            event.currentTarget.className = `app-theme-btn p-2 rounded-xl bg-slate-900 border-2 border-${colorName === 'orange' ? 'orange-500' : colorName === 'cyan' ? 'cyan-400' : colorName === 'green' ? 'emerald-400' : colorName === 'red' ? 'rose-500' : 'purple-500'} flex flex-col items-center gap-1 cursor-pointer`;
+        };
+
+        // --- Auth Functions ---
+        window.setAuthMode = function(mode) {
+            currentAuthMode = mode;
+            const btnReg = document.getElementById('btn-auth-mode-register');
+            const btnLog = document.getElementById('btn-auth-mode-login');
+            const usernameField = document.getElementById('auth-username-field');
+            const vehicleField = document.getElementById('auth-vehicle-field');
+            const cityField = document.getElementById('auth-city-field');
+            const submitBtn = document.getElementById('btn-auth-submit');
+
+            if (mode === 'login') {
+                if (btnLog) btnLog.className = "py-2 rounded-xl bg-orange-500 text-white transition";
+                if (btnReg) btnReg.className = "py-2 rounded-xl text-gray-400 hover:text-white transition";
+                if (usernameField) usernameField.classList.add('hidden');
+                if (vehicleField) vehicleField.classList.add('hidden');
+                if (cityField) cityField.classList.add('hidden');
+                if (submitBtn) submitBtn.textContent = "LOGGA IN 🚀";
+            } else {
+                if (btnReg) btnReg.className = "py-2 rounded-xl bg-orange-500 text-white transition";
+                if (btnLog) btnLog.className = "py-2 rounded-xl text-gray-400 hover:text-white transition";
+                if (usernameField) usernameField.classList.remove('hidden');
+                if (vehicleField) vehicleField.classList.remove('hidden');
+                if (cityField) cityField.classList.remove('hidden');
+                if (submitBtn) submitBtn.textContent = "SKAPA KONTO & FORTSÄTT 🚀";
+            }
+        };
+
+        window.handleAuthSubmit = function(e) {
+            if (e && e.preventDefault) e.preventDefault();
+            const emailEl = document.getElementById('auth-input-email');
+            const usernameEl = document.getElementById('auth-input-username');
+            const vehicleEl = document.getElementById('auth-input-vehicle');
+            const cityEl = document.getElementById('auth-input-city');
+
+            const email = emailEl ? emailEl.value : '';
+            const username = (usernameEl && usernameEl.value) ? usernameEl.value : (email ? email.split('@')[0] : 'Förare');
+            
+            currentUser = {
+                name: username,
+                email: email,
+                vehicle: vehicleEl ? vehicleEl.value : 'car',
+                city: cityEl ? cityEl.value : 'stockholm'
             };
 
-            if (titles[tabId]) {
-                const topTitle = document.getElementById('top-title');
-                const topSub = document.getElementById('top-sub');
-                if (topTitle) topTitle.innerText = titles[tabId].title;
-                if (topSub) topSub.innerText = titles[tabId].sub;
-            }
+            const headerNameEl = document.getElementById('header-driver-name');
+            const headerTagEl = document.getElementById('header-driver-tag');
+            const authScreenEl = document.getElementById('auth-screen');
 
-            ['feed', 'events', 'map'].forEach(t => {
-                const navBtn = document.getElementById(`nav-${t}`);
-                if (navBtn) {
-                    if (t === tabId) {
-                        navBtn.classList.remove('text-gray-400');
-                        navBtn.classList.add('text-orange-400');
-                    } else {
-                        navBtn.classList.remove('text-orange-400');
-                        navBtn.classList.add('text-gray-400');
-                    }
-                }
+            if (headerNameEl) headerNameEl.textContent = username;
+            if (headerTagEl) headerTagEl.classList.remove('hidden');
+            if (authScreenEl) authScreenEl.classList.add('hidden');
+            
+            return false;
+        };
+
+        window.loginAsGuest = function() {
+            currentUser = {
+                name: 'Gästförare',
+                vehicle: 'car',
+                city: 'stockholm'
+            };
+            const headerNameEl = document.getElementById('header-driver-name');
+            const headerTagEl = document.getElementById('header-driver-tag');
+            const authScreenEl = document.getElementById('auth-screen');
+
+            if (headerNameEl) headerNameEl.textContent = 'Gästförare';
+            if (headerTagEl) headerTagEl.classList.remove('hidden');
+            if (authScreenEl) authScreenEl.classList.add('hidden');
+        };
+
+        // --- Navigation Tabs ---
+        window.switchTab = function(tabId) {
+            document.querySelectorAll('.app-screen').forEach(el => el.classList.remove('active'));
+            const targetScreen = document.getElementById(`screen-${tabId}`);
+            if (targetScreen) targetScreen.classList.add('active');
+
+            // Reset navigation tab button highlights
+            ['feed', 'events', 'map'].forEach(id => {
+                const btn = document.getElementById(`nav-btn-${id}`);
+                if (btn) btn.className = "flex flex-col items-center gap-1 text-gray-400 hover:text-white transition cursor-pointer";
             });
 
+            const activeBtn = document.getElementById(`nav-btn-${tabId}`);
+            if (activeBtn) activeBtn.className = "flex flex-col items-center gap-1 text-orange-400 transition cursor-pointer";
+
             if (tabId === 'map') {
-                setTimeout(() => {
-                    if (!map) {
-                        initMap();
+                ensureLeafletLoaded();
+            }
+        };
+
+        // --- Speedometer & Gauges ---
+        function generateSpeedoTicks() {
+            const container = document.getElementById('speedo-ticks-container');
+            const labelsContainer = document.getElementById('speedo-labels-container');
+            if (!container) return;
+            container.innerHTML = '';
+            if (labelsContainer) labelsContainer.innerHTML = '';
+
+            const cx = 150, cy = 150, r = 132;
+            const labelRadius = 110; // Placerar siffrorna perfekt inbäddade precis vid bågens insida
+            const startAngle = -125;
+            const endAngle = 125;
+            const totalTicks = 60;
+
+            const speedValues = [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 210, 240];
+
+            for (let i = 0; i <= totalTicks; i++) {
+                const angleDeg = startAngle + (i / totalTicks) * (endAngle - startAngle);
+                const angleRad = (angleDeg - 90) * (Math.PI / 180);
+
+                const isMajor = i % 5 === 0;
+                const length = isMajor ? 10 : 5;
+                const width = isMajor ? 2.5 : 1;
+
+                const x1 = cx + (r - length) * Math.cos(angleRad);
+                const y1 = cy + (r - length) * Math.sin(angleRad);
+                const x2 = cx + r * Math.cos(angleRad);
+                const y2 = cy + r * Math.sin(angleRad);
+
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line.setAttribute('x1', x1);
+                line.setAttribute('y1', y1);
+                line.setAttribute('x2', x2);
+                line.setAttribute('y2', y2);
+                line.setAttribute('stroke', isMajor ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.3)');
+                line.setAttribute('stroke-width', width);
+
+                container.appendChild(line);
+            }
+
+            // Generera sifferetiketter perfekt längs bågens cirkulära linje
+            if (labelsContainer) {
+                speedValues.forEach(val => {
+                    const ratio = val / 240;
+                    const angleDeg = startAngle + ratio * (endAngle - startAngle);
+                    const angleRad = (angleDeg - 90) * (Math.PI / 180);
+
+                    const lx = cx + labelRadius * Math.cos(angleRad);
+                    const ly = cy + labelRadius * Math.sin(angleRad);
+
+                    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    text.setAttribute('x', lx);
+                    text.setAttribute('y', ly);
+                    text.setAttribute('text-anchor', 'middle');
+                    text.setAttribute('dominant-baseline', 'central');
+                    text.setAttribute('font-weight', '900');
+                    text.setAttribute('font-size', '12');
+
+                    if (val === 0 || val === 100) {
+                        text.setAttribute('fill', 'var(--speedo-color)');
+                    } else if (val >= 160 && val < 210) {
+                        text.setAttribute('fill', '#f59e0b');
+                    } else if (val >= 210) {
+                        text.setAttribute('fill', '#f43f5e');
                     } else {
-                        map.invalidateSize();
+                        text.setAttribute('fill', '#ffffff');
                     }
-                }, 100);
+
+                    text.textContent = val;
+                    labelsContainer.appendChild(text);
+                });
             }
         }
 
-        function toggleRightChat() {
-            const panel = document.getElementById('right-chat-panel');
-            if (panel) {
-                panel.classList.toggle('closed');
+        window.setSpeedometerTheme = function(theme) {
+            activeTheme = theme;
+            const container = document.getElementById('speedo-modal-container');
+            const themeLabel = document.getElementById('speedo-theme-label');
+            if (container) {
+                container.className = `glass-panel w-full max-w-md rounded-3xl p-6 border-2 border-cyan-400/50 shadow-[0_0_40px_rgba(0,240,255,0.2)] relative bg-slate-950 text-center space-y-5 speedo-theme-${theme}`;
             }
-        }
+            if (themeLabel) {
+                themeLabel.textContent = theme.toUpperCase();
+            }
+        };
 
-        function openSpeedOverviewModal() {
+        window.cycleSpeedometerTheme = function() {
+            const currentIndex = themes.indexOf(activeTheme);
+            const nextTheme = themes[(currentIndex + 1) % themes.length];
+            window.setSpeedometerTheme(nextTheme);
+        };
+
+        window.openSpeedOverviewModal = function() {
             const modal = document.getElementById('speed-overview-modal');
             if (modal) {
                 modal.classList.remove('opacity-0', 'pointer-events-none');
             }
-        }
+        };
 
-        function closeSpeedOverviewModal() {
+        window.closeSpeedOverviewModal = function() {
             const modal = document.getElementById('speed-overview-modal');
             if (modal) {
                 modal.classList.add('opacity-0', 'pointer-events-none');
             }
+        };
+
+        window.toggleSpeedometer = function() {
+            isSpeedoActive = !isSpeedoActive;
+            const btn = document.getElementById('btn-toggle-speedo');
+            const mapStatus = document.getElementById('speedo-map-status');
+            const statusSub = document.getElementById('speedo-status-sub');
+            const mapSpeedEl = document.getElementById('gps-speed-val');
+            const modalSpeedEl = document.getElementById('modal-big-speed');
+            const needle = document.getElementById('speedo-needle');
+            const gaugeArc = document.getElementById('speedo-gauge-arc');
+
+            if (isSpeedoActive) {
+                // Reset telemetry stats back to zero on startup
+                maxSpeed = 0;
+                driveSeconds = 0;
+                totalDistance = 0;
+
+                const maxSpeedEl = document.getElementById('stat-max-speed');
+                const avgSpeedEl = document.getElementById('stat-avg-speed');
+                const distEl = document.getElementById('stat-dist');
+                const timeEl = document.getElementById('stat-time');
+
+                if (maxSpeedEl) maxSpeedEl.textContent = "0 km/h";
+                if (avgSpeedEl) avgSpeedEl.textContent = "0 km/h";
+                if (distEl) distEl.textContent = "0.0 km";
+                if (timeEl) timeEl.textContent = "0 s";
+
+                if (btn) {
+                    btn.className = "px-5 py-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 rounded-xl text-xs font-black flex items-center gap-2 transition cursor-pointer";
+                    btn.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span><span>Stoppa Speedometer</span>`;
+                }
+                if (mapStatus) {
+                    mapStatus.textContent = "● AKTIV";
+                    mapStatus.className = "text-[9px] font-bold text-emerald-400 block tracking-wider";
+                }
+                if (statusSub) {
+                    statusSub.textContent = "● MÄTNING IGÅNG";
+                    statusSub.className = "text-[10px] text-emerald-400 font-extrabold uppercase tracking-widest";
+                }
+                startSpeedSimulation();
+            } else {
+                if (driveTimerInterval) clearInterval(driveTimerInterval);
+                currentSpeed = 0;
+
+                if (btn) {
+                    btn.className = "px-5 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-black flex items-center gap-2 transition cursor-pointer";
+                    btn.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span><span>Starta Speedometer</span>`;
+                }
+                if (mapStatus) {
+                    mapStatus.textContent = "PAUSAD";
+                    mapStatus.className = "text-[9px] font-bold text-gray-400 block tracking-wider";
+                }
+                if (statusSub) {
+                    statusSub.textContent = "PAUSAD";
+                    statusSub.className = "text-[10px] text-gray-400 font-extrabold uppercase tracking-widest";
+                }
+                if (mapSpeedEl) mapSpeedEl.textContent = "0";
+                if (modalSpeedEl) modalSpeedEl.textContent = "0";
+                if (needle) needle.style.transform = `rotate(-125deg)`;
+                if (gaugeArc) gaugeArc.style.strokeDashoffset = `597`;
+            }
+        };
+
+        function startSpeedSimulation() {
+            if (driveTimerInterval) clearInterval(driveTimerInterval);
+
+            driveTimerInterval = setInterval(() => {
+                if (!isSpeedoActive) return;
+                driveSeconds++;
+                
+                // Simulate variable drive speed reaching full scale up to 240 km/h
+                const wave = (Math.sin(driveSeconds * 0.15) + 1) / 2; // normalized 0..1
+                const target = Math.floor(wave * 240);
+                currentSpeed = Math.min(240, Math.max(0, target));
+                if (currentSpeed > maxSpeed) maxSpeed = currentSpeed;
+                totalDistance += (currentSpeed / 3600);
+
+                // Update UI elements
+                const mapSpeedEl = document.getElementById('gps-speed-val');
+                const modalSpeedEl = document.getElementById('modal-big-speed');
+                const needle = document.getElementById('speedo-needle');
+                const gaugeArc = document.getElementById('speedo-gauge-arc');
+                
+                if (mapSpeedEl) mapSpeedEl.textContent = currentSpeed;
+                if (modalSpeedEl) modalSpeedEl.textContent = currentSpeed;
+
+                // Gauge needle angle rotation (-125deg at 0 km/h to +125deg for 240 km/h)
+                if (needle) {
+                    const angle = -125 + Math.min(currentSpeed / 240, 1) * 250;
+                    needle.style.transform = `rotate(${angle}deg)`;
+                }
+
+                // Gauge active arc progress fill (max outer arc length = 656px)
+                if (gaugeArc) {
+                    const progress = Math.min(currentSpeed / 240, 1);
+                    const offset = 656 - (progress * 656);
+                    gaugeArc.style.strokeDashoffset = offset;
+                }
+
+                // Stats updates
+                const maxSpeedEl = document.getElementById('stat-max-speed');
+                const avgSpeedEl = document.getElementById('stat-avg-speed');
+                const distEl = document.getElementById('stat-dist');
+                const timeEl = document.getElementById('stat-time');
+
+                if (maxSpeedEl) maxSpeedEl.textContent = `${maxSpeed} km/h`;
+                if (avgSpeedEl) avgSpeedEl.textContent = `${Math.floor(currentSpeed * 0.85)} km/h`;
+                if (distEl) distEl.textContent = `${totalDistance.toFixed(1)} km`;
+                if (timeEl) timeEl.textContent = `${driveSeconds} s`;
+            }, 1000);
         }
 
-        function submitIncidentAlert() {
-            const typeSelect = document.getElementById('inc-type-select');
-            const descInput = document.getElementById('input-incident-desc');
-            if (!typeSelect || !descInput) return;
+        // --- Map Initialization ---
+        function ensureLeafletLoaded() {
+            if (typeof L !== 'undefined') {
+                initLeafletMap();
+            } else {
+                setTimeout(ensureLeafletLoaded, 200);
+            }
+        }
 
-            const incType = typeSelect.value;
-            const desc = descInput.value.trim() || 'Trafikhändelse rapporterad';
-
-            let titlePrefix = '⚠️ HINDER';
-            let bgStyle = 'badge-hazard';
-            let iconSymbol = '⚠️';
-
-            if (incType === 'police') {
-                titlePrefix = '🚓 POLISKONTROLL';
-                bgStyle = 'badge-car';
-                iconSymbol = '🚓';
-            } else if (incType === 'accident') {
-                titlePrefix = '💥 OLYCKA';
-                bgStyle = 'badge-hazard';
-                iconSymbol = '💥';
-            } else if (incType === 'traffic') {
-                titlePrefix = '🚗 TÄT KÖ';
-                bgStyle = 'badge-event';
-                iconSymbol = '🚗';
+        function initLeafletMap() {
+            if (map) {
+                map.invalidateSize();
+                return;
             }
 
+            const mapEl = document.getElementById('map');
+            if (!mapEl) return;
+
+            map = L.map('map', { zoomControl: false }).setView([59.3293, 18.0686], 13);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap'
+            }).addTo(map);
+
+            // Mock riders on map with live speed tags
+            const mockRiders = [
+                { id: 'r1', lat: 59.332, lng: 18.064, name: 'Turbo_Marcus', speed: '72 km/h', type: 'car', vehicleName: 'Audi RS6 C8', city: 'Stockholm' },
+                { id: 'r2', lat: 59.325, lng: 18.071, name: 'Moppe_Elin', speed: '45 km/h', type: 'helmet', vehicleName: 'Yamaha Aerox 70cc', city: 'Stockholm' },
+                { id: 'r3', lat: 59.338, lng: 18.055, name: 'MC_Viktor', speed: '88 km/h', type: 'helmet', vehicleName: 'Kawasaki Ninja ZX-10R', city: 'Stockholm' }
+            ];
+
+            mockRiders.forEach(r => {
+                const iconHtml = `
+                    <div class="rider-marker-wrap">
+                        <div class="pulse-ring ${r.type}"></div>
+                        <div class="rider-label">${r.name} • <span class="text-cyan-400 font-extrabold">${r.speed}</span></div>
+                        <div class="avatar-box bg-slate-900">
+                            <span class="text-sm">${r.type === 'car' ? '🏎️' : '🏍️'}</span>
+                        </div>
+                    </div>
+                `;
+
+                const customIcon = L.divIcon({
+                    html: iconHtml,
+                    className: '',
+                    iconSize: [44, 44],
+                    iconAnchor: [22, 22]
+                });
+
+                const marker = L.marker([r.lat, r.lng], { icon: customIcon }).addTo(map);
+
+                // Clicking rider icon on map opens their profile modal
+                marker.on('click', () => {
+                    openRiderProfileModal(r);
+                });
+            });
+
+            setTimeout(() => { if (map) map.invalidateSize(); }, 300);
+        }
+
+        // --- Rider Profile Modal & Direct Chat Functions ---
+        window.openRiderProfileModal = function(rider) {
+            selectedRiderForChat = rider;
+            const modal = document.getElementById('rider-profile-modal');
+            const avatarEl = document.getElementById('target-rider-avatar');
+            const nameEl = document.getElementById('target-rider-name');
+            const typeEl = document.getElementById('target-rider-type');
+            const speedEl = document.getElementById('target-rider-speed');
+            const locationEl = document.getElementById('target-rider-location');
+
+            if (avatarEl) avatarEl.innerHTML = rider.type === 'car' ? '🏎️' : '🏍️';
+            if (nameEl) nameEl.textContent = rider.name;
+            if (typeEl) typeEl.textContent = `${rider.vehicleName || 'Fordon'} • Aktiv`;
+            if (speedEl) speedEl.textContent = rider.speed;
+            if (locationEl) locationEl.textContent = rider.city || 'Stockholm';
+
+            if (modal) {
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+            }
+        };
+
+        window.closeRiderProfileModal = function() {
+            const modal = document.getElementById('rider-profile-modal');
+            if (modal) {
+                modal.classList.add('opacity-0', 'pointer-events-none');
+            }
+        };
+
+        window.openDirectChatFromRider = function() {
+            if (!selectedRiderForChat) return;
+            closeRiderProfileModal();
+
+            // Open Side Chat Drawer & load conversation
+            const panel = document.getElementById('right-chat-panel');
+            if (panel && panel.classList.contains('closed')) {
+                panel.classList.remove('closed');
+            }
+
+            openSideChatConversation(
+                selectedRiderForChat.id,
+                selectedRiderForChat.name,
+                `Direktchatt • ${selectedRiderForChat.vehicleName || 'Aktiv Rider'}`,
+                'from-cyan-500 to-blue-600'
+            );
+        };
+
+        // --- SOS / Emergency Broadcast Modal Functions ---
+        window.openIncidentModal = function() {
+            const modal = document.getElementById('sos-alert-modal');
+            const coordsEl = document.getElementById('sos-live-coords');
+
+            // Try to acquire navigator live position or default to map view coordinates
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        const lat = pos.coords.latitude.toFixed(4);
+                        const lng = pos.coords.longitude.toFixed(4);
+                        if (coordsEl) coordsEl.textContent = `Aktuell GPS: ${lat}, ${lng}`;
+                    },
+                    () => {
+                        if (coordsEl) coordsEl.textContent = `Stockholm (59.3293, 18.0686)`;
+                    }
+                );
+            }
+
+            if (modal) {
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+            }
+        };
+
+        window.closeIncidentModal = function() {
+            const modal = document.getElementById('sos-alert-modal');
+            if (modal) {
+                modal.classList.add('opacity-0', 'pointer-events-none');
+            }
+        };
+
+        window.selectSosType = function(btn, type) {
+            selectedSosCategory = type;
+            document.querySelectorAll('.sos-type-btn').forEach(b => {
+                b.className = "sos-type-btn p-3 rounded-2xl bg-slate-900 border border-white/15 text-gray-300 font-bold text-xs flex flex-col items-center gap-1 cursor-pointer";
+            });
+            btn.className = "sos-type-btn p-3 rounded-2xl bg-rose-950/60 border-2 border-rose-500 text-white font-extrabold text-xs flex flex-col items-center gap-1 cursor-pointer";
+        };
+
+        window.sendEmergencyBroadcast = function() {
+            const descInput = document.getElementById('sos-input-desc');
+            const desc = descInput ? descInput.value.trim() : '';
+            const coordsEl = document.getElementById('sos-live-coords');
+            const locationText = coordsEl ? coordsEl.textContent : 'Live Position (59.3293, 18.0686)';
+
+            const iconsMap = {
+                'Poliskontroll': '🚔',
+                'Olycka': '⚠️',
+                'Väghinder': '🚧',
+                'Bilkö': '🚗',
+                'Fartkamera': '📷'
+            };
+
+            const icon = iconsMap[selectedSosCategory] || '🚨';
+
+            // Inject Emergency Post directly into feed with auto live location attachment
+            const feedPosts = document.getElementById('feed-posts-container');
+            if (feedPosts) {
+                const post = document.createElement('div');
+                post.className = "glass-panel rounded-2xl p-4 space-y-3 border-2 border-rose-500/80 bg-rose-950/30 shadow-[0_0_20px_rgba(244,63,94,0.3)] animate-pulse";
+                post.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-full bg-rose-500/30 border border-rose-400 flex items-center justify-center text-xs">${icon}</div>
+                            <div>
+                                <h3 class="text-xs font-black text-rose-300">${selectedSosCategory.toUpperCase()}</h3>
+                                <p class="text-[9px] text-rose-200">Rapporterad av ${currentUser ? currentUser.name : 'Rider'} • Just nu</p>
+                            </div>
+                        </div>
+                        <span class="px-2 py-0.5 rounded-md bg-rose-500 text-white text-[10px] font-black uppercase">AKUT LARM</span>
+                    </div>
+                    <p class="text-xs text-white font-bold">${desc || `Varning för ${selectedSosCategory.toLowerCase()}!`}</p>
+                    <div class="p-2 bg-slate-900/90 rounded-xl border border-cyan-500/30 flex items-center gap-2 text-[10px] text-cyan-300 font-extrabold">
+                        <i data-lucide="map-pin" class="w-3.5 h-3.5 text-cyan-400"></i>
+                        <span>Plats: ${locationText}</span>
+                    </div>
+                `;
+                feedPosts.prepend(post);
+                if (window.lucide) lucide.createIcons();
+            }
+
+            // Also place dynamic red SOS marker onto map
             if (map) {
-                const labelText = `${titlePrefix}: ${desc}`;
-                const markerIcon = L.divIcon({
+                const sosIcon = L.divIcon({
                     html: `
                         <div class="rider-marker-wrap">
                             <div class="pulse-ring hazard-accident"></div>
-                            <div class="rider-label bg-rose-950 text-rose-300 font-extrabold border-rose-500">${labelText}</div>
-                            <div class="avatar-box bg-rose-600 border-2 border-white">
-                                <span class="text-white font-black text-xs">${iconSymbol}</span>
+                            <div class="rider-label bg-rose-600 border-rose-400">${icon} ${selectedSosCategory}</div>
+                            <div class="avatar-box bg-rose-600 border-rose-400">
+                                <span class="text-sm">${icon}</span>
                             </div>
                         </div>
                     `,
                     className: '',
-                    iconSize: [50, 50],
-                    iconAnchor: [25, 25]
+                    iconSize: [44, 44],
+                    iconAnchor: [22, 22]
                 });
-
-                L.marker([currentUser.lat, currentUser.lng], { icon: markerIcon })
-                    .addTo(map)
-                    .bindPopup(`<b style="color:black;">${labelText}</b><br>Rapporterad av ${currentUser.name}`);
+                L.marker([59.3293 + (Math.random() * 0.008 - 0.004), 18.0686 + (Math.random() * 0.008 - 0.004)], { icon: sosIcon }).addTo(map);
             }
 
             closeIncidentModal();
-            showToast(`Larm publicerat: ${titlePrefix}! 🚨`);
-        }
+            alert(`🚨 Larm sänt! Din live position (${locationText}) har kopplats till larmet och skickats till alla förare.`);
+        };
 
-        function handleAvatarUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                currentUser.avatarImg = e.target.result;
-                updateAvatarUI();
-                showToast('Profilbild uppladdad! 📸');
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function resetAvatarImage() {
-            currentUser.avatarImg = null;
-            document.getElementById('input-profile-avatar').value = '';
-            updateAvatarUI();
-            showToast('Profilbild återställd!');
-        }
-
-        function updateAvatarUI() {
-            const imgEl = document.getElementById('profile-avatar-img');
-            const letterEl = document.getElementById('profile-avatar-letter');
-            
-            if (currentUser.avatarImg) {
-                if (imgEl) {
-                    imgEl.src = currentUser.avatarImg;
-                    imgEl.classList.remove('hidden');
-                }
-                if (letterEl) letterEl.classList.add('hidden');
-            } else {
-                if (imgEl) imgEl.classList.add('hidden');
-                if (letterEl) {
-                    letterEl.innerText = (currentUser.name || 'N').charAt(0).toUpperCase();
-                    letterEl.classList.remove('hidden');
-                }
+        window.recenterMap = function() {
+            if (map) {
+                map.setView([59.3293, 18.0686], 14);
             }
-        }
+        };
 
-        function createCustomMarkerIcon(type, labelName, colorGradientClass, isSelf = false, speedVal = 0, isSpeedPublic = true, avatarImg = null) {
-            let badgeIcon = type === 'car' ? '🚗' : '🏍️';
-            let badgeClass = type === 'car' ? 'badge-car' : 'badge-helmet';
-            let pulseClass = type === 'car' ? 'car' : 'helmet';
-            
-            let speedBadge = '';
-            if (isSpeedPublic) {
-                speedBadge = `<span class="ml-1 text-[9px] text-cyan-300 font-black">(${speedVal} km/h)</span>`;
-            } else {
-                speedBadge = `<span class="ml-1 text-[9px] text-gray-400 font-semibold">(Privat)</span>`;
-            }
+        window.setFilter = function(type) {
+            ['all', 'car', 'helmet'].forEach(t => {
+                const btn = document.getElementById(`filter-${t}`);
+                if (btn) {
+                    btn.className = (t === type)
+                        ? "px-3 py-1 rounded-xl text-xs font-bold transition-all bg-white/20 text-white"
+                        : "px-3 py-1 rounded-xl text-xs font-bold transition-all text-gray-300 hover:text-white";
+                }
+            });
+        };
 
-            const avatarContent = avatarImg 
-                ? `<img src="${avatarImg}" class="w-full h-full object-cover rounded-full" />`
-                : `<span class="text-white font-black text-xs">${labelName.charAt(0).toUpperCase()}</span>`;
+        // --- Chat Drawer & Modals ---
+        window.toggleRightChat = function() {
+            const panel = document.getElementById('right-chat-panel');
+            if (panel) panel.classList.toggle('closed');
+        };
 
-            const html = `
-                <div class="rider-marker-wrap">
-                    <div class="pulse-ring ${pulseClass}"></div>
-                    <div class="rider-label">${labelName}${speedBadge}</div>
-                    <div class="avatar-box bg-gradient-to-tr ${colorGradientClass} ${isSelf ? 'ring-4 ring-cyan-400' : ''} overflow-hidden">
-                        ${avatarContent}
-                        <div class="vehicle-badge ${badgeClass}">${badgeIcon}</div>
-                    </div>
+        window.closeSideChatConversation = function() {
+            const convoView = document.getElementById('side-chat-convo-view');
+            if (convoView) convoView.classList.add('hidden');
+        };
+
+        window.openSideChatConversation = function(id, name, sub, gradient) {
+            const titleEl = document.getElementById('side-convo-title');
+            const subEl = document.getElementById('side-convo-sub');
+            const convoView = document.getElementById('side-chat-convo-view');
+            if (titleEl) titleEl.textContent = name;
+            if (subEl) subEl.textContent = sub;
+            if (convoView) convoView.classList.remove('hidden');
+        };
+
+        window.sendSideMessage = function() {
+            const input = document.getElementById('side-chat-input');
+            const container = document.getElementById('side-messages-container');
+            if (!input || !input.value.trim() || !container) return;
+
+            const msg = document.createElement('div');
+            msg.className = "flex justify-end";
+            msg.innerHTML = `
+                <div class="bg-orange-500 text-white p-2.5 rounded-2xl max-w-[80%] shadow-md">
+                    <p class="text-xs">${input.value.trim()}</p>
+                    <span class="text-[9px] text-orange-200 block text-right mt-1">Just nu</span>
                 </div>
             `;
-
-            return L.divIcon({ html, className: '', iconSize: [50, 50], iconAnchor: [25, 25] });
-        }
-
-        function openUserConfigModal() {
-            const el = document.getElementById('user-config-modal');
-            if (!el) return;
-            
-            document.getElementById('input-user-name').value = currentUser.name;
-            document.getElementById('input-user-status').value = currentUser.status;
-            document.getElementById('input-user-vehicle').value = currentUser.type;
-            document.getElementById('input-user-lang').value = currentUser.lang || 'sv';
-            document.getElementById('input-user-city').value = currentUser.city || 'stockholm';
-            document.getElementById('input-location-mode').value = currentUser.locationPermission || 'while_using';
-
-            updateAvatarUI();
-
-            el.classList.remove('opacity-0', 'pointer-events-none');
-        }
-
-        function saveUserProfile() {
-            const name = document.getElementById('input-user-name').value.trim();
-            const status = document.getElementById('input-user-status').value.trim();
-            const vehicle = document.getElementById('input-user-vehicle').value;
-            const lang = document.getElementById('input-user-lang').value;
-            const city = document.getElementById('input-user-city').value;
-
-            if (name) currentUser.name = name;
-            if (status) currentUser.status = status;
-            currentUser.type = vehicle;
-            currentUser.city = city;
-            currentUser.lang = lang;
-
-            document.getElementById('header-driver-name').innerText = currentUser.name;
-
-            if (currentUser.marker && map) {
-                currentUser.marker.setIcon(createCustomMarkerIcon(currentUser.type, currentUser.name, currentUser.color, true, currentUser.speed, currentUser.isSpeedPublic, currentUser.avatarImg));
-            }
-
-            closeUserConfigModal();
-            const dict = translations[currentUser.lang] || translations.sv;
-            showToast(dict.saveToast);
-        }
-
-        function closeUserConfigModal() {
-            const el = document.getElementById('user-config-modal');
-            if (el) el.classList.add('opacity-0', 'pointer-events-none');
-        }
-
-        function changeUserCity(cityKey) {
-            currentUser.city = cityKey;
-            if (cityCoords[cityKey]) {
-                currentUser.lat = cityCoords[cityKey].lat;
-                currentUser.lng = cityCoords[cityKey].lng;
-                if (map) {
-                    map.flyTo([currentUser.lat, currentUser.lng], 13);
-                    if (currentUser.marker) currentUser.marker.setLatLng([currentUser.lat, currentUser.lng]);
-                }
-            }
-            applyFilters();
-            renderEvents();
-        }
-
-        function toggleNearbyFilter() {
-            filterOnlyNearby = !filterOnlyNearby;
-            const btn = document.getElementById('btn-nearby-toggle');
-            const lbl = document.getElementById('nearby-label');
-            
-            if (filterOnlyNearby) {
-                const cityName = cityCoords[currentUser.city]?.name || 'Närheten';
-                if (btn) btn.className = 'glass-button px-3 py-2 rounded-2xl flex items-center gap-1 text-xs font-bold text-orange-400 border-orange-500/50 bg-orange-500/20';
-                if (lbl) lbl.innerText = `Bara ${cityName}`;
-                showToast(`Visar endast riders & meets i ${cityName}`);
-            } else {
-                if (btn) btn.className = 'glass-button px-3 py-2 rounded-2xl flex items-center gap-1 text-xs font-bold text-gray-300 hover:text-white';
-                if (lbl) lbl.innerText = 'Alla Områden';
-                showToast('Visar alla områden');
-            }
-            applyFilters();
-            renderEvents();
-        }
-
-        // Comprehensive multi-language dictionary for full app translation
-        const translations = {
-            sv: {
-                saveToast: "Profil sparad! 🇸🇪",
-                feedTitle: "RideOut Feed",
-                feedSub: "Gemenskap & Aktiviteter",
-                meetsTitle: "Kommande Meets",
-                meetsSub: "Planerade träffar & cruising",
-                mapTitle: "Live Karta",
-                mapSub: "Se förare & larm i realtid",
-                speedBtn: "Hastighet",
-                dmTitle: "Direktmeddelanden",
-                dmSub: "Chatta med förare i närheten",
-                recentEvents: "Senaste Händelser",
-                reportIncident: "Larma Händelse",
-                messagesHeader: "Meddelanden",
-                directGroupsBadge: "Direkt & Grupper",
-                upcomingMeets: "Kommande RideOuts",
-                upcomingMeetsSub: "Hitta cruisingar för bilar, MC, mopeder och fyrhjulningar.",
-                btnCreate: "Skapa",
-                btnLarma: "Larma",
-                gpsSpeedLabel: "GPS Fart",
-                navFeed: "Flöde",
-                navEvents: "Meets",
-                navChat: "Chat",
-                navMap: "Karta",
-                filterAll: "Alla",
-                filterCars: "🚗 Bilar",
-                filterHelmets: "🏍️ MC/Moppe/Quad",
-                driverTitle: "Förare",
-                noMeets: "Inga planerade RideOuts hittades i ditt valda område."
-            },
-            en: {
-                saveToast: "Profile saved! 🇬🇧",
-                feedTitle: "RideOut Feed",
-                feedSub: "Community & Activities",
-                meetsTitle: "Upcoming Meets",
-                meetsSub: "Planned meets & cruising",
-                mapTitle: "Live Map",
-                mapSub: "See drivers & alerts in real time",
-                speedBtn: "Speed",
-                dmTitle: "Direct Messages",
-                dmSub: "Chat with nearby riders",
-                recentEvents: "Recent Events",
-                reportIncident: "Report Alert",
-                messagesHeader: "Messages",
-                directGroupsBadge: "Direct & Groups",
-                upcomingMeets: "Upcoming RideOuts",
-                upcomingMeetsSub: "Find cruises for cars, bikes, mopeds and quads.",
-                btnCreate: "Create",
-                btnLarma: "Alert",
-                gpsSpeedLabel: "GPS Speed",
-                navFeed: "Feed",
-                navEvents: "Meets",
-                navChat: "Chat",
-                navMap: "Map",
-                filterAll: "All",
-                filterCars: "🚗 Cars",
-                filterHelmets: "🏍️ Bikes/Mopeds",
-                driverTitle: "Driver",
-                noMeets: "No planned RideOuts found in your selected area."
-            },
-            no: {
-                saveToast: "Profil lagret! 🇳🇴",
-                feedTitle: "RideOut Strøm",
-                feedSub: "Fellesskap og aktiviteter",
-                meetsTitle: "Kommende Møter",
-                meetsSub: "Planlagte treff og cruising",
-                mapTitle: "Kart Live",
-                mapSub: "Se førere og varsler i sanntid",
-                speedBtn: "Hastighet",
-                dmTitle: "Direktemeldinger",
-                dmSub: "Chat med førere i nærheten",
-                recentEvents: "Siste Händelser",
-                reportIncident: "Meld fra",
-                messagesHeader: "Meldinger",
-                directGroupsBadge: "Direkte & Grupper",
-                upcomingMeets: "Kommende RideOuts",
-                upcomingMeetsSub: "Finn treff for biler, MC, moped og quad.",
-                btnCreate: "Opprett",
-                btnLarma: "Varsle",
-                gpsSpeedLabel: "GPS Fart",
-                navFeed: "Fløy",
-                navEvents: "Treff",
-                navChat: "Chat",
-                navMap: "Kart",
-                filterAll: "Alle",
-                filterCars: "🚗 Biler",
-                filterHelmets: "🏍️ MC/Moped",
-                driverTitle: "Fører",
-                noMeets: "Ingen planlagte RideOuts funnet i ditt valgte område."
-            },
-            fi: {
-                saveToast: "Profiili tallennettu! 🇫🇮",
-                feedTitle: "RideOut Syöte",
-                feedSub: "Yhteisö & Aktiviteetit",
-                meetsTitle: "Tulevat Tapaamiset",
-                meetsSub: "Suunnitellut kokoontumiset",
-                mapTitle: "Live Kartta",
-                mapSub: "Katso kuljettajat ja hälytykset",
-                speedBtn: "Nopeus",
-                dmTitle: "Suoraviestit",
-                dmSub: "Keskustele läheisten kuljettajien kanssa",
-                recentEvents: "Viimeisimmät Tapahtumat",
-                reportIncident: "Tee Hälytys",
-                messagesHeader: "Viestit",
-                directGroupsBadge: "Yksityis & Ryhmät",
-                upcomingMeets: "Tulevat RideOutit",
-                upcomingMeetsSub: "Löydä miitit autoille, moottoripyörille ja mopoille.",
-                btnCreate: "Luo",
-                btnLarma: "Hälytä",
-                gpsSpeedLabel: "GPS Nopeus",
-                navFeed: "Syöte",
-                navEvents: "Miitit",
-                navChat: "Chat",
-                navMap: "Kartta",
-                filterAll: "Kaikki",
-                filterCars: "🚗 Autot",
-                filterHelmets: "🏍️ MP/Mopot",
-                driverTitle: "Kuljettaja",
-                noMeets: "Suunniteltuja RideOuteja ei löytynyt valitultasi alueelta."
-            },
-            de: {
-                saveToast: "Profil gespeichert! 🇩🇪",
-                feedTitle: "RideOut Feed",
-                feedSub: "Community & Aktivitäten",
-                meetsTitle: "Kommende Treffen",
-                meetsSub: "Geplante Ausfahrten & Treffen",
-                mapTitle: "Live Karte",
-                mapSub: "Fahrer & Warnungen in Echtzeit",
-                speedBtn: "Tempo",
-                dmTitle: "Direktnachrichten",
-                dmSub: "Chatte mit Fahrern in der Nähe",
-                recentEvents: "Neueste Ereignisse",
-                reportIncident: "Meldung erstellen",
-                messagesHeader: "Nachrichten",
-                directGroupsBadge: "Direkt & Gruppen",
-                upcomingMeets: "Anstehende RideOuts",
-                upcomingMeetsSub: "Finde Treffen für Autos, Motorräder & Mopeds.",
-                btnCreate: "Erstellen",
-                btnLarma: "Warnen",
-                gpsSpeedLabel: "GPS Tempo",
-                navFeed: "Feed",
-                navEvents: "Treffen",
-                navChat: "Chat",
-                navMap: "Karte",
-                filterAll: "Alle",
-                filterCars: "🚗 Autos",
-                filterHelmets: "🏍️ Bikes/Mopeds",
-                driverTitle: "Fahrer",
-                noMeets: "Keine geplanten RideOuts in deiner Region gefunden."
-            }
-        };
-
-        function changeAppLanguage(langKey) {
-            currentUser.lang = langKey;
-            applyTranslations();
-        }
-
-        function applyTranslations() {
-            const lang = currentUser.lang || 'sv';
-            const dict = translations[lang] || translations.sv;
-
-            // Element mapping
-            const mapElements = {
-                'btn-hdr-speed': dict.speedBtn,
-                'dm-title': dict.dmTitle,
-                'dm-sub': dict.dmSub,
-                'txt-recent-events': dict.recentEvents,
-                'txt-report-incident-link': dict.reportIncident,
-                'txt-direct-groups-badge': dict.directGroupsBadge,
-                'txt-upcoming-meets': dict.upcomingMeets,
-                'txt-upcoming-meets-sub': dict.upcomingMeetsSub,
-                'btn-create-event': dict.btnCreate,
-                'btn-map-larma': dict.btnLarma,
-                'lbl-gps-speed': dict.gpsSpeedLabel,
-                'lbl-nav-feed': dict.navFeed,
-                'lbl-nav-events': dict.navEvents,
-                'lbl-nav-chat': dict.navChat,
-                'lbl-nav-map': dict.navMap,
-                'filter-all': dict.filterAll,
-                'filter-car': dict.filterCars,
-                'filter-helmet': dict.filterHelmets
-            };
-
-            for (const [id, text] of Object.entries(mapElements)) {
-                const el = document.getElementById(id);
-                if (el) el.innerText = text;
-            }
-
-            // Update Header titles dynamically
-            const activeScreen = document.querySelector('.app-screen.active')?.id.replace('screen-', '') || 'feed';
-            switchTab(activeScreen);
-            renderEvents();
-        }
-
-        function switchTab(tabId) {
-            document.querySelectorAll('.app-screen').forEach(el => el.classList.remove('active'));
-            
-            const targetScreen = document.getElementById(`screen-${tabId}`);
-            if (targetScreen) {
-                targetScreen.classList.add('active');
-            }
-
-            const dict = translations[currentUser.lang || 'sv'] || translations.sv;
-
-            const titles = {
-                feed: { title: dict.feedTitle, sub: dict.feedSub },
-                events: { title: dict.meetsTitle, sub: dict.meetsSub },
-                map: { title: dict.mapTitle, sub: dict.mapSub }
-            };
-
-            if (titles[tabId]) {
-                const topTitle = document.getElementById('top-title');
-                const topSub = document.getElementById('top-sub');
-                if (topTitle) topTitle.innerText = titles[tabId].title;
-                if (topSub) topSub.innerText = titles[tabId].sub;
-            }
-
-            ['feed', 'events', 'map'].forEach(t => {
-                const navBtn = document.getElementById(`nav-${t}`);
-                if (navBtn) {
-                    if (t === tabId) {
-                        navBtn.classList.remove('text-gray-400');
-                        navBtn.classList.add('text-orange-400');
-                    } else {
-                        navBtn.classList.remove('text-orange-400');
-                        navBtn.classList.add('text-gray-400');
-                    }
-                }
-            });
-
-            if (tabId === 'map') {
-                setTimeout(() => {
-                    if (!map) {
-                        initMap();
-                    } else {
-                        map.invalidateSize();
-                    }
-                }, 100);
-            }
-        }
-
-        function saveUserProfile() {
-            const name = document.getElementById('input-user-name').value.trim();
-            const status = document.getElementById('input-user-status').value.trim();
-            const vehicle = document.getElementById('input-user-vehicle').value;
-            const lang = document.getElementById('input-user-lang').value;
-            const city = document.getElementById('input-user-city').value;
-
-            if (name) currentUser.name = name;
-            if (status) currentUser.status = status;
-            currentUser.type = vehicle;
-            currentUser.city = city;
-            currentUser.lang = lang;
-
-            document.getElementById('header-driver-name').innerText = currentUser.name;
-
-            if (currentUser.marker && map) {
-                currentUser.marker.setIcon(createCustomMarkerIcon(currentUser.type, currentUser.name, currentUser.color, true, currentUser.speed, currentUser.isSpeedPublic, currentUser.avatarImg));
-            }
-
-            applyTranslations();
-            closeUserConfigModal();
-            const dict = translations[currentUser.lang] || translations.sv;
-            showToast(dict.saveToast);
-        }
-
-        function renderEvents() {
-            const container = document.getElementById('events-list-container');
-            if (!container) return;
-
-            const dict = translations[currentUser.lang || 'sv'] || translations.sv;
-            let html = '';
-            const filteredEvents = eventsList.filter(e => !filterOnlyNearby || e.city === currentUser.city);
-
-            if (filteredEvents.length === 0) {
-                html = `<div class="p-6 text-center text-gray-400 text-xs font-semibold">${dict.noMeets}</div>`;
-            } else {
-                filteredEvents.forEach(e => {
-                    html += `
-                        <div class="glass-panel p-4 rounded-2xl border border-white/15 space-y-2">
-                            <div class="flex items-center justify-between">
-                                <h3 class="font-extrabold text-sm text-white">${e.title}</h3>
-                                <span class="text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full border border-orange-500/30">${e.attendees} Riders</span>
-                            </div>
-                            <p class="text-xs text-gray-300">📍 ${e.location} • ⏰ ${e.time}</p>
-                        </div>
-                    `;
-                });
-            }
-
-            container.innerHTML = html;
-        }
-
-        window.onload = function() {
-            if (window.lucide) lucide.createIcons();
-            const drvName = document.getElementById('header-driver-name');
-            if (drvName) drvName.innerText = currentUser.name || "Förare";
-            applyTranslations();
-            renderFeed();
-            renderEvents();
-            renderSideDirectChats();
-        };
-
-        // Render feed posts in the feed view
-        function renderFeed() {
-            const feedContainer = document.getElementById('feed-posts-container');
-            if (!feedContainer) return;
-
-            let html = '';
-            posts.forEach(post => {
-                const badgeIcon = post.type === 'car' ? '🚗' : '🏍️';
-                html += `
-                    <div class="glass-panel p-4 rounded-3xl border border-white/15 space-y-2 bg-slate-900/80">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2.5">
-                                <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-black text-xs border border-cyan-400">
-                                    ${post.author.charAt(0).toUpperCase()}
-                                </div>
-                                <div>
-                                    <h4 class="font-extrabold text-white text-xs flex items-center gap-1.5">
-                                        ${post.author} <span>${badgeIcon}</span>
-                                    </h4>
-                                    <span class="text-[10px] text-gray-400">${post.time}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <p class="text-xs text-gray-200 leading-relaxed">${post.content}</p>
-                    </div>
-                `;
-            });
-
-            feedContainer.innerHTML = html;
-        }
-
-        // Render DMs in the side drawer and inline box
-        function renderSideDirectChats() {
-            const sideList = document.getElementById('side-direct-chats-list');
-            const feedList = document.getElementById('feed-inline-chats-list');
-
-            let sideHtml = '';
-            let feedHtml = '';
-
-            riders.forEach(r => {
-                const badgeIcon = r.type === 'car' ? '🚗' : '🏍️';
-                const lastMsgObj = (chatMessages[r.id] && chatMessages[r.id].length > 0) 
-                    ? chatMessages[r.id][chatMessages[r.id].length - 1] 
-                    : { text: r.status, time: '' };
-
-                sideHtml += `
-                    <div onclick="openSideChatConversation('${r.id}', '${r.name}', '${r.vehicleName}', '${r.color}')" class="glass-button p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:border-cyan-400/50">
-                        <div class="flex items-center gap-2.5">
-                            <div class="w-8 h-8 rounded-full bg-gradient-to-tr ${r.color} flex items-center justify-center text-white font-bold text-xs">
-                                ${r.name.charAt(0)}
-                            </div>
-                            <div>
-                                <span class="font-bold text-white text-xs block flex items-center gap-1">${r.name} <span>${badgeIcon}</span></span>
-                                <span class="text-[10px] text-gray-400 block truncate max-w-[140px]">${lastMsgObj.text}</span>
-                            </div>
-                        </div>
-                        <span class="text-[9px] text-gray-500">${lastMsgObj.time}</span>
-                    </div>
-                `;
-
-                feedHtml += `
-                    <div onclick="toggleRightChat(); openSideChatConversation('${r.id}', '${r.name}', '${r.vehicleName}', '${r.color}')" class="glass-button p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:border-cyan-400/50">
-                        <div class="flex items-center gap-2.5">
-                            <div class="w-8 h-8 rounded-full bg-gradient-to-tr ${r.color} flex items-center justify-center text-white font-bold text-xs">
-                                ${r.name.charAt(0)}
-                            </div>
-                            <div>
-                                <span class="font-bold text-white text-xs block">${r.name}</span>
-                                <span class="text-[10px] text-gray-400 block truncate max-w-[140px]">${lastMsgObj.text}</span>
-                            </div>
-                        </div>
-                        <span class="text-[9px] text-gray-500">${lastMsgObj.time}</span>
-                    </div>
-                `;
-            });
-
-            if (sideList) sideList.innerHTML = sideHtml;
-            if (feedList) feedList.innerHTML = feedHtml;
-        }
-
-        function openSideChatConversation(chatId, name, subText, colorClass) {
-            activeChatId = chatId;
-            document.getElementById('side-chat-list-view').classList.add('hidden');
-            document.getElementById('side-chat-convo-view').classList.remove('hidden');
-
-            document.getElementById('side-convo-title').innerText = name;
-            document.getElementById('side-convo-sub').innerText = subText;
-            
-            const avatarEl = document.getElementById('side-convo-avatar');
-            if (avatarEl) {
-                avatarEl.className = `w-8 h-8 rounded-full bg-gradient-to-tr ${colorClass} flex items-center justify-center text-white font-bold text-xs`;
-                avatarEl.innerText = name.charAt(0).toUpperCase();
-            }
-
-            renderSideMessages();
-        }
-
-        function closeSideChatConversation() {
-            activeChatId = null;
-            document.getElementById('side-chat-convo-view').classList.add('hidden');
-            document.getElementById('side-chat-list-view').classList.remove('hidden');
-        }
-
-        function renderSideMessages() {
-            if (!activeChatId) return;
-            const container = document.getElementById('side-messages-container');
-            if (!container) return;
-
-            const msgs = chatMessages[activeChatId] || [];
-            let html = '';
-
-            msgs.forEach(m => {
-                const isMe = m.isMe || m.sender === currentUser.name;
-                html += `
-                    <div class="flex ${isMe ? 'justify-end' : 'justify-start'}">
-                        <div class="max-w-[80%] rounded-2xl px-3 py-2 ${isMe ? 'bg-orange-500 text-white rounded-br-none' : 'bg-slate-800 text-gray-200 rounded-bl-none border border-white/10'}">
-                            ${!isMe ? `<span class="block text-[9px] font-bold text-orange-400 mb-0.5">${m.sender}</span>` : ''}
-                            <p class="text-xs">${m.text}</p>
-                            <span class="block text-[8px] ${isMe ? 'text-white/70' : 'text-gray-400'} text-right mt-1">${m.time}</span>
-                        </div>
-                    </div>
-                `;
-            });
-
-            container.innerHTML = html;
-            container.scrollTop = container.scrollHeight;
-        }
-
-        function sendSideMessage() {
-            const input = document.getElementById('side-chat-input');
-            if (!input || !activeChatId) return;
-            const text = input.value.trim();
-            if (!text) return;
-
-            if (!chatMessages[activeChatId]) {
-                chatMessages[activeChatId] = [];
-            }
-
-            const now = new Date();
-            const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-
-            chatMessages[activeChatId].push({
-                sender: currentUser.name,
-                text: text,
-                time: timeStr,
-                isMe: true
-            });
-
+            container.appendChild(msg);
             input.value = '';
-            renderSideMessages();
-            renderSideDirectChats();
-        }
+            container.scrollTop = container.scrollHeight;
+        };
+
+        window.openUserConfigModal = function() {
+            const modal = document.getElementById('user-config-modal');
+            const inputName = document.getElementById('profile-input-name');
+            const inputVehicle = document.getElementById('profile-input-vehicle');
+            const inputCity = document.getElementById('profile-input-city');
+            const inputLang = document.getElementById('profile-input-language');
+            const ghostToggle = document.getElementById('setting-ghost-toggle');
+            const nameDisplay = document.getElementById('profile-name-display');
+
+            if (currentUser) {
+                if (inputName) inputName.value = currentUser.name || '';
+                if (inputVehicle) inputVehicle.value = currentUser.vehicle || 'car';
+                if (inputCity) inputCity.value = currentUser.city || 'stockholm';
+                if (nameDisplay) nameDisplay.textContent = currentUser.name || 'Förarprofil';
+            }
+
+            if (inputLang) inputLang.value = currentLanguage;
+            if (ghostToggle) ghostToggle.checked = isGhostMode;
+
+            if (modal) {
+                modal.classList.remove('opacity-0', 'pointer-events-none');
+            }
+        };
+
+        window.closeUserConfigModal = function() {
+            const modal = document.getElementById('user-config-modal');
+            if (modal) {
+                modal.classList.add('opacity-0', 'pointer-events-none');
+            }
+        };
+
+        window.saveUserProfile = function() {
+            const inputName = document.getElementById('profile-input-name');
+            const inputVehicle = document.getElementById('profile-input-vehicle');
+            const inputCity = document.getElementById('profile-input-city');
+
+            const nameVal = inputName ? inputName.value.trim() : '';
+
+            if (nameVal) {
+                if (!currentUser) currentUser = {};
+                currentUser.name = nameVal;
+                if (inputVehicle) currentUser.vehicle = inputVehicle.value;
+                if (inputCity) currentUser.city = inputCity.value;
+
+                const headerNameEl = document.getElementById('header-driver-name');
+                if (headerNameEl) headerNameEl.textContent = nameVal;
+            }
+
+            closeUserConfigModal();
+        };
+
+        window.logoutUser = function() {
+            currentUser = null;
+            closeUserConfigModal();
+            const authScreenEl = document.getElementById('auth-screen');
+            if (authScreenEl) authScreenEl.classList.remove('hidden');
+        };
+
+        window.openCreateEventModal = function() {
+            alert("Skapa ny RideOut-träff är förnärvarande i demoläge.");
+        };
+
+        // --- App Startup ---
+        window.addEventListener('DOMContentLoaded', () => {
+            generateSpeedoTicks();
+            if (window.lucide) lucide.createIcons();
+        });
     </script>
 </body>
 </html>
